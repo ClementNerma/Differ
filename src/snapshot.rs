@@ -30,17 +30,6 @@ pub enum SnapshotItemMetadata {
     },
 }
 
-impl SnapshotItemMetadata {
-    pub fn is_same_type(&self, other: &SnapshotItemMetadata) -> bool {
-        match (self, other) {
-            (Self::Directory, Self::Directory) => true,
-            (Self::Directory, _) => false,
-            (Self::File { .. }, Self::File { .. }) => true,
-            (Self::File { .. }, _) => false,
-        }
-    }
-}
-
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SnapshotComparableFileMetadata {
     pub modif_date: i64,
