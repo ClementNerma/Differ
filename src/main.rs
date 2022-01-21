@@ -1,5 +1,10 @@
+#![forbid(unsafe_code)]
+#![forbid(unused_must_use)]
+
+mod diff;
 mod snapshot;
 
-fn main() {
-    println!("Hello, world!");
-}
+#[cfg(test)]
+mod tests;
+
+fn main() {}
