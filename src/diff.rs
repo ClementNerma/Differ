@@ -15,38 +15,46 @@ pub enum DiffType {
     Deleted,
 }
 
-pub fn build_diff(source: Snapshot, dest: Snapshot) -> Diff {
+pub fn build_diff(source: Snapshot, backup_dir: Snapshot) -> Diff {
     let source_items = build_item_names_hashset(&source);
-    let dest_items = build_item_names_hashset(&dest);
+    let backed_up_items = build_item_names_hashset(&backup_dir);
 
     let mut diff = Vec::with_capacity(source_items.len());
 
-    diff.extend(source_items.difference(&dest_items).map(|item| DiffItem {
-        path: PathBuf::from(item),
-        status: DiffType::Added,
-    }));
+    diff.extend(
+        source_items
+            .difference(&backed_up_items)
+            .map(|item| DiffItem {
+                path: PathBuf::from(item),
+                status: DiffType::Added,
+            }),
+    );
 
-    diff.extend(dest_items.difference(&source_items).map(|item| DiffItem {
-        path: PathBuf::from(item),
-        status: DiffType::Deleted,
-    }));
+    diff.extend(
+        backed_up_items
+            .difference(&source_items)
+            .map(|item| DiffItem {
+                path: PathBuf::from(item),
+                status: DiffType::Deleted,
+            }),
+    );
 
     diff.extend(
         source
             .items
             .iter()
-            .filter(|item| dest_items.contains(&item.path))
+            .filter(|item| backed_up_items.contains(&item.path))
             .filter_map(|source_item| {
-                let dest_item = dest
+                let backed_up_item = backup_dir
                     .items
                     .iter()
                     .find(|c| c.path == source_item.path)
                     .unwrap();
 
-                match (&source_item.metadata, &dest_item.metadata) {
+                match (&source_item.metadata, &backed_up_item.metadata) {
                     // Both directories = no change
                     (SnapshotItemMetadata::Directory, SnapshotItemMetadata::Directory) => None,
-                    // Source item is directory and destination item is file or the opposite = type changed
+                    // Source item is directory and backed up item is file or the opposite = type changed
                     (SnapshotItemMetadata::Directory, SnapshotItemMetadata::File { .. })
                     | (SnapshotItemMetadata::File { .. }, SnapshotItemMetadata::Directory) => {
                         Some(DiffItem {
@@ -61,11 +69,11 @@ pub fn build_diff(source: Snapshot, dest: Snapshot) -> Diff {
                             ..
                         },
                         SnapshotItemMetadata::File {
-                            comparable: dest_data,
+                            comparable: backed_up_data,
                             ..
                         },
                     ) => {
-                        if source_data == dest_data {
+                        if source_data == backed_up_data {
                             None
                         } else {
                             Some(DiffItem {
