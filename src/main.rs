@@ -13,18 +13,21 @@ use crate::{
 };
 use clap::StructOpt;
 use cmd::Args;
+use colored::Colorize;
 
 fn main() {
     let cmd = Args::parse();
 
-    println!("Building source directory snapshot...");
+    println!("{}", "Building source directory snapshot...".blue());
     let source = make_snapshot(&cmd.source_dir).unwrap();
 
-    println!("Building backup directory snapshot...");
+    println!("{}", "Building backup directory snapshot...".blue());
     let backup = make_snapshot(Path::new(&cmd.backup_dir)).unwrap();
 
-    println!("Diffing...");
+    println!("{}", "Diffing...".blue());
     let diff = build_diff(source, backup);
+
+    println!();
 
     for item in diff {
         let sym = match item.status {
@@ -34,6 +37,16 @@ fn main() {
             DiffType::Deleted => "-",
         };
 
-        println!("{} {}", sym, item.path.display());
+        let message = format!("{} {}", sym, item.path.display());
+
+        println!(
+            "{}",
+            match item.status {
+                DiffType::Added => message.bright_green(),
+                DiffType::Changed => message.bright_yellow(),
+                DiffType::TypeChanged => message.bright_yellow(),
+                DiffType::Deleted => message.bright_red(),
+            }
+        );
     }
 }
