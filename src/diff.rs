@@ -1,38 +1,18 @@
-use crate::snapshot::{Snapshot, SnapshotItem, SnapshotItemMetadata};
-use std::{cmp::Ordering, collections::HashSet, path::PathBuf};
+use crate::snapshot::{Snapshot, SnapshotItemMetadata};
+use std::{collections::HashSet, path::PathBuf};
 
 pub type Diff = Vec<DiffItem>;
 
-#[derive(PartialEq, Eq)]
 pub struct DiffItem {
     pub path: PathBuf,
     pub status: DiffType,
 }
 
-impl PartialOrd for DiffItem {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        match self.status.cmp(&other.status) {
-            Ordering::Equal => self.path.partial_cmp(&other.path),
-            ord => Some(ord),
-        }
-    }
-}
-
-impl Ord for DiffItem {
-    fn cmp(&self, other: &Self) -> Ordering {
-        match self.status.cmp(&other.status) {
-            Ordering::Equal => self.path.cmp(&other.path),
-            ord => ord,
-        }
-    }
-}
-
-#[derive(PartialEq, Eq, PartialOrd, Ord)]
 pub enum DiffType {
-    Added = 1,
-    Changed = 2,
-    TypeChanged = 3, // File => Dir / Dir => File
-    Deleted = 4,
+    Added,
+    Changed,
+    TypeChanged, // File => Dir / Dir => File
+    Deleted,
 }
 
 pub fn build_diff(source: Snapshot, dest: Snapshot) -> Diff {
@@ -98,7 +78,7 @@ pub fn build_diff(source: Snapshot, dest: Snapshot) -> Diff {
             }),
     );
 
-    diff.sort();
+    diff.sort_by(|a, b| a.path.cmp(&b.path));
     diff
 }
 
