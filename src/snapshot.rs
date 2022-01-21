@@ -34,8 +34,9 @@ impl SnapshotItemMetadata {
     pub fn is_same_type(&self, other: &SnapshotItemMetadata) -> bool {
         match (self, other) {
             (Self::Directory, Self::Directory) => true,
+            (Self::Directory, _) => false,
             (Self::File { .. }, Self::File { .. }) => true,
-            _ => false,
+            (Self::File { .. }, _) => false,
         }
     }
 }
