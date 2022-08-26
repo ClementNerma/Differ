@@ -29,7 +29,7 @@ fn main() {
 
     println!();
 
-    for item in diff {
+    for item in diff.items() {
         let sym = match item.status {
             DiffType::Added => "+",
             DiffType::Changed => "~",
@@ -39,14 +39,13 @@ fn main() {
 
         let message = format!("{} {}", sym, item.path.display());
 
-        println!(
-            "{}",
-            match item.status {
-                DiffType::Added => message.bright_green(),
-                DiffType::Changed => message.bright_yellow(),
-                DiffType::TypeChanged => message.bright_yellow(),
-                DiffType::Deleted => message.bright_red(),
-            }
-        );
+        let message = match item.status {
+            DiffType::Added => message.bright_green(),
+            DiffType::Changed => message.bright_yellow(),
+            DiffType::TypeChanged => message.bright_yellow(),
+            DiffType::Deleted => message.bright_red(),
+        };
+
+        println!("{}", message);
     }
 }
