@@ -40,6 +40,26 @@ impl SnapshotItemMetadata {
             } => Some(comparable.size),
         }
     }
+
+    pub fn is_dir(&self) -> bool {
+        match self {
+            Self::Directory => true,
+            Self::File {
+                creation_date: _,
+                comparable,
+            } => false,
+        }
+    }
+
+    pub fn is_file(&self) -> bool {
+        match self {
+            Self::Directory => false,
+            Self::File {
+                creation_date: _,
+                comparable,
+            } => true,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]

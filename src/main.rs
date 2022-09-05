@@ -50,9 +50,6 @@ fn main() {
 
     println!();
 
-    let item_size =
-        |item: SnapshotItemMetadata| item.size().map(human_size).unwrap_or(String::from("-"));
-
     for item in diff.items() {
         let symbol = match item.status {
             DiffType::Added { new: _ } => "+",
@@ -61,20 +58,20 @@ fn main() {
             DiffType::Deleted { prev: _ } => "-",
         };
 
-        let size_update = match item.status {
-            DiffType::Added { new } => item_size(new),
-            DiffType::Changed { prev, new } => format!("{} => {}", item_size(prev), item_size(new)),
-            DiffType::TypeChanged { prev, new } => {
-                format!("{} => {}", item_size(prev), item_size(new))
-            }
-            DiffType::Deleted { prev } => item_size(prev),
-        };
-
         let message = format!(
-            "{} {} {}",
+            "{} {}{} {}",
             symbol,
             item.path.display(),
-            format!("({})", size_update) //.bright_yellow()
+            if matches!(item.status.get_new_metadata(), Some(m) if m.is_dir()) {
+                "/"
+            } else {
+                ""
+            },
+            item.status
+                .get_new_metadata()
+                .and_then(|m| m.size())
+                .map(|s| format!("({})", human_size(s)))
+                .unwrap_or(String::new())
         );
 
         let message = match item.status {

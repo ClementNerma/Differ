@@ -64,6 +64,26 @@ pub enum DiffType {
     },
 }
 
+impl DiffType {
+    pub fn get_new_metadata(&self) -> Option<&SnapshotItemMetadata> {
+        match self {
+            Self::Added { new } => Some(new),
+            Self::Changed { prev, new } => Some(new),
+            Self::TypeChanged { prev, new } => Some(new),
+            Self::Deleted { prev } => None,
+        }
+    }
+
+    pub fn get_prev_metadata(&self) -> Option<&SnapshotItemMetadata> {
+        match self {
+            Self::Added { new } => None,
+            Self::Changed { prev, new } => Some(prev),
+            Self::TypeChanged { prev, new } => Some(prev),
+            Self::Deleted { prev } => Some(prev),
+        }
+    }
+}
+
 pub fn build_diff(source: Snapshot, backup_dir: Snapshot) -> Diff {
     let source_items = build_item_names_hashmap(&source);
     let backed_up_items = build_item_names_hashmap(&backup_dir);
