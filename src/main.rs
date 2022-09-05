@@ -3,6 +3,7 @@
 
 mod cmd;
 mod diff;
+mod logging;
 mod snapshot;
 
 use std::path::Path;
@@ -18,13 +19,13 @@ use colored::Colorize;
 fn main() {
     let cmd = Args::parse();
 
-    println!("{}", "Building source directory snapshot...".blue());
+    info!("Building source directory snapshot...");
     let source = make_snapshot(&cmd.source_dir).unwrap();
 
-    println!("{}", "Building backup directory snapshot...".blue());
+    info!("Building backup directory snapshot...");
     let backup = make_snapshot(Path::new(&cmd.backup_dir)).unwrap();
 
-    println!("{}", "Diffing...".blue());
+    info!("Diffing...");
     let diff = build_diff(source, backup);
 
     println!();
