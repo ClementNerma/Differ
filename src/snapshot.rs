@@ -21,7 +21,7 @@ pub struct SnapshotItem {
     pub metadata: SnapshotItemMetadata,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum SnapshotItemMetadata {
     Directory,
     File {
@@ -30,7 +30,19 @@ pub enum SnapshotItemMetadata {
     },
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+impl SnapshotItemMetadata {
+    pub fn size(&self) -> Option<u64> {
+        match self {
+            Self::Directory => None,
+            Self::File {
+                creation_date: _,
+                comparable,
+            } => Some(comparable.size),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct SnapshotComparableFileMetadata {
     pub modif_date: i64,
     pub size: u64,

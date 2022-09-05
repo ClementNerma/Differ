@@ -10,11 +10,31 @@ use std::path::Path;
 
 use crate::{
     diff::{build_diff, DiffType},
-    snapshot::make_snapshot,
+    snapshot::{make_snapshot, SnapshotItemMetadata},
 };
 use clap::StructOpt;
 use cmd::Args;
 use colored::Colorize;
+
+fn human_size(bytes: u64) -> String {
+    if bytes < 1024 {
+        return format!("{} B", bytes);
+    }
+
+    let mut bytes = bytes as f64 / 1024.0;
+
+    if bytes < 1024.0 {
+        return format!("{:.2} KiB", bytes);
+    }
+
+    bytes /= 1024.0;
+
+    if bytes < 1024.0 {
+        return format!("{:.2} MiB", bytes);
+    }
+
+    format!("{:.2} GiB", bytes / 1024.0)
+}
 
 fn main() {
     let cmd = Args::parse();
@@ -30,21 +50,38 @@ fn main() {
 
     println!();
 
+    let item_size =
+        |item: SnapshotItemMetadata| item.size().map(human_size).unwrap_or(String::from("-"));
+
     for item in diff.items() {
-        let sym = match item.status {
-            DiffType::Added => "+",
-            DiffType::Changed => "~",
-            DiffType::TypeChanged => "!",
-            DiffType::Deleted => "-",
+        let symbol = match item.status {
+            DiffType::Added { new: _ } => "+",
+            DiffType::Changed { prev: _, new: _ } => "~",
+            DiffType::TypeChanged { prev: _, new: _ } => "!",
+            DiffType::Deleted { prev: _ } => "-",
         };
 
-        let message = format!("{} {}", sym, item.path.display());
+        let size_update = match item.status {
+            DiffType::Added { new } => item_size(new),
+            DiffType::Changed { prev, new } => format!("{} => {}", item_size(prev), item_size(new)),
+            DiffType::TypeChanged { prev, new } => {
+                format!("{} => {}", item_size(prev), item_size(new))
+            }
+            DiffType::Deleted { prev } => item_size(prev),
+        };
+
+        let message = format!(
+            "{} {} {}",
+            symbol,
+            item.path.display(),
+            format!("({})", size_update) //.bright_yellow()
+        );
 
         let message = match item.status {
-            DiffType::Added => message.bright_green(),
-            DiffType::Changed => message.bright_yellow(),
-            DiffType::TypeChanged => message.bright_yellow(),
-            DiffType::Deleted => message.bright_red(),
+            DiffType::Added { new: _ } => message.bright_green(),
+            DiffType::Changed { prev: _, new: _ } => message.bright_yellow(),
+            DiffType::TypeChanged { prev: _, new: _ } => message.bright_yellow(),
+            DiffType::Deleted { prev: _ } => message.bright_red(),
         };
 
         println!("{}", message);

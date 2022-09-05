@@ -1,5 +1,9 @@
 use crate::snapshot::{Snapshot, SnapshotItemMetadata};
-use std::{collections::HashSet, path::PathBuf, cmp::Ordering};
+use std::{
+    cmp::Ordering,
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+};
 
 pub struct Diff(Vec<DiffItem>);
 
@@ -35,39 +39,59 @@ impl PartialOrd for DiffItem {
 
 impl Ord for DiffItem {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.status.cmp(&other.status).then_with(|| self.path.cmp(&other.path)).then(Ordering::Equal)
+        self.status
+            .cmp(&other.status)
+            .then_with(|| self.path.cmp(&other.path))
+            .then(Ordering::Equal)
     }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum DiffType {
-    Added,
-    Changed,
-    TypeChanged, // File => Dir / Dir => File
-    Deleted,
+    Added {
+        new: SnapshotItemMetadata,
+    },
+    Changed {
+        prev: SnapshotItemMetadata,
+        new: SnapshotItemMetadata,
+    },
+    TypeChanged {
+        prev: SnapshotItemMetadata,
+        new: SnapshotItemMetadata,
+    }, // File => Dir / Dir => File
+    Deleted {
+        prev: SnapshotItemMetadata,
+    },
 }
 
 pub fn build_diff(source: Snapshot, backup_dir: Snapshot) -> Diff {
-    let source_items = build_item_names_hashset(&source);
-    let backed_up_items = build_item_names_hashset(&backup_dir);
+    let source_items = build_item_names_hashmap(&source);
+    let backed_up_items = build_item_names_hashmap(&backup_dir);
+
+    let source_items_paths: HashSet<_> = source_items.keys().collect();
+    let backed_up_items_paths: HashSet<_> = backed_up_items.keys().collect();
 
     let mut diff = Vec::with_capacity(source_items.len());
 
     diff.extend(
-        source_items
-            .difference(&backed_up_items)
+        source_items_paths
+            .difference(&backed_up_items_paths)
             .map(|item| DiffItem {
                 path: PathBuf::from(item),
-                status: DiffType::Added,
+                status: DiffType::Added {
+                    new: **source_items.get(*item).unwrap(),
+                },
             }),
     );
 
     diff.extend(
-        backed_up_items
-            .difference(&source_items)
+        backed_up_items_paths
+            .difference(&source_items_paths)
             .map(|item| DiffItem {
                 path: PathBuf::from(item),
-                status: DiffType::Deleted,
+                status: DiffType::Deleted {
+                    prev: **backed_up_items.get(*item).unwrap(),
+                },
             }),
     );
 
@@ -75,7 +99,7 @@ pub fn build_diff(source: Snapshot, backup_dir: Snapshot) -> Diff {
         source
             .items
             .iter()
-            .filter(|item| backed_up_items.contains(&item.path))
+            .filter(|item| backed_up_items_paths.contains(&&item.path))
             .filter_map(|source_item| {
                 let backed_up_item = backup_dir
                     .items
@@ -91,7 +115,10 @@ pub fn build_diff(source: Snapshot, backup_dir: Snapshot) -> Diff {
                     | (SnapshotItemMetadata::File { .. }, SnapshotItemMetadata::Directory) => {
                         Some(DiffItem {
                             path: PathBuf::from(&source_item.path),
-                            status: DiffType::TypeChanged,
+                            status: DiffType::TypeChanged {
+                                prev: backed_up_item.metadata,
+                                new: source_item.metadata,
+                            },
                         })
                     }
                     // Otherwise, compare their metadata to see if something changed
@@ -110,7 +137,10 @@ pub fn build_diff(source: Snapshot, backup_dir: Snapshot) -> Diff {
                         } else {
                             Some(DiffItem {
                                 path: PathBuf::from(&source_item.path),
-                                status: DiffType::Changed,
+                                status: DiffType::Changed {
+                                    prev: backed_up_item.metadata,
+                                    new: source_item.metadata,
+                                },
                             })
                         }
                     }
@@ -123,10 +153,10 @@ pub fn build_diff(source: Snapshot, backup_dir: Snapshot) -> Diff {
     diff
 }
 
-fn build_item_names_hashset(snapshot: &Snapshot) -> HashSet<&String> {
+fn build_item_names_hashmap(snapshot: &Snapshot) -> HashMap<&String, &SnapshotItemMetadata> {
     snapshot
         .items
         .iter()
-        .map(|item| &item.path)
-        .collect::<HashSet<_>>()
+        .map(|item| (&item.path, &item.metadata))
+        .collect::<HashMap<_, _>>()
 }
