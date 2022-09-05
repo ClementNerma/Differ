@@ -13,8 +13,4 @@ pub struct Args {
     /// Backup directory
     #[clap(help = "Backup directory (where to write the backup files)")]
     pub backup_dir: PathBuf,
-
-    /// Differential directory
-    #[clap(help = "Differential directory (intermediary backup)")]
-    pub diff_dir: PathBuf,
 }
