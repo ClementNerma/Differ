@@ -6,7 +6,6 @@ use anyhow::{bail, Result};
 pub struct Snapshot {
     // TODO: add checksum
     // TODO: add creation date
-    pub driver_id: String,
     pub path: String,
     pub items: Vec<DriverItem>,
 }
@@ -24,16 +23,10 @@ pub fn make_snapshot(driver: &dyn Driver, path: &str) -> Result<Snapshot> {
         }
     }
 
-    Ok(Snapshot {
-        driver_id: driver.id(),
-        items,
-        path,
-    })
+    Ok(Snapshot { items, path })
 }
 
 pub trait Driver {
-    // fn get_metadata(path: &Path) -> Result<ItemMetadata, DriverError>;
-    fn id(&self) -> String;
     fn find_all(&self, dir: &str) -> Result<Vec<DriverItem>>;
     fn canonicalize(&self, path: &str) -> Result<String>;
 }

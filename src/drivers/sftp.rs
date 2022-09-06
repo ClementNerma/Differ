@@ -30,10 +30,6 @@ impl SftpDriver {
 }
 
 impl Driver for SftpDriver {
-    fn id(&self) -> String {
-        "sftp".to_string()
-    }
-
     fn canonicalize(&self, path: &str) -> Result<String> {
         todo!()
     }

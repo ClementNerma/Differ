@@ -22,10 +22,6 @@ impl Default for FsDriver {
 }
 
 impl Driver for FsDriver {
-    fn id(&self) -> String {
-        "fs:local".to_string()
-    }
-
     fn canonicalize(&self, path: &str) -> Result<String> {
         Ok(canonicalize(path)
             .with_context(|| format!("Failed to canonicalize base directory at: {path}"))?
