@@ -1,5 +1,7 @@
 use anyhow::Result;
-use std::{fs::canonicalize, os::unix::prelude::MetadataExt, path::Path};
+use std::{
+    collections::HashSet, ffi::OsStr, fs::canonicalize, os::unix::prelude::MetadataExt, path::Path,
+};
 
 use anyhow::{bail, Context};
 use rayon::prelude::{ParallelBridge, ParallelIterator};
@@ -22,7 +24,9 @@ impl Default for FsDriver {
 }
 
 impl Driver for FsDriver {
-    fn find_all(&self, root: &str) -> Result<Vec<DriverItem>> {
+    fn find_all(&self, root: &str, ignore: &HashSet<&str>) -> Result<Vec<DriverItem>> {
+        let ignore: HashSet<_> = ignore.iter().map(OsStr::new).collect();
+
         let root = canonicalize(root)
             .with_context(|| format!("Failed to canonicalize base directory at: {root}"))?;
 
@@ -40,48 +44,60 @@ impl Driver for FsDriver {
         WalkDir::new(root)
             .min_depth(1)
             .into_iter()
+            .filter_entry(|entry| {
+                !entry
+                    .path()
+                    .ancestors()
+                    .any(|ancestor| match ancestor.file_name() {
+                        Some(name) => ignore.contains(name),
+                        None => false,
+                    })
+            })
             .par_bridge()
             .map(|item| {
-                let item = item?;
-                let path = item.path();
+                let item = item.context("Failed to access item")?;
+                let item = item.path();
 
-                if path.is_symlink() {
+                let path = get_relative_utf8_path(item, root)?.to_string();
+
+                if item.is_symlink() {
                     // TODO: symbolic links
-                    bail!("Warning: ignored symbolic link: {}", path.display())
-                } else if path.is_dir() {
-                    Ok(DriverItem {
-                        path: get_relative_utf8_path(path, root)?.to_string(),
+                    bail!("Warning: ignored symbolic link: {}", item.display())
+                } else if item.is_dir() {
+                    Ok(Some(DriverItem {
+                        path,
                         metadata: DriverItemMetadata::Directory,
-                    })
-                } else if path.is_file() {
-                    let metadata = path.metadata().with_context(|| {
-                        format!("Failed to get file's metadata for: {}", path.display())
+                    }))
+                } else if item.is_file() {
+                    let metadata = item.metadata().with_context(|| {
+                        format!("Failed to get file's metadata for: {}", item.display())
                     })?;
 
                     // TODO: get real size
-                    Ok(DriverItem {
-                        path: get_relative_utf8_path(path, root)?.to_string(),
+                    Ok(Some(DriverItem {
+                        path,
                         metadata: DriverItemMetadata::File(DriverFileMetadata {
                             // creation_date: metadata.ctime(),
                             modification_date: metadata.mtime(),
                             size: metadata.len(),
                         }),
-                    })
+                    }))
                 } else {
-                    bail!("Encountered unknown item type at: {}", path.display())
+                    bail!("Encountered unknown item type at: {}", item.display())
                 }
             })
+            .filter_map(|r| r.transpose())
             .collect::<Result<Vec<_>, _>>()
     }
 }
 
 fn get_relative_utf8_path<'a>(path: &'a Path, source: &Path) -> Result<&'a str> {
     path.strip_prefix(source)
-        .expect("Internal error: failed to strip prefix")
+        .context("Internal error: failed to strip prefix")?
         .to_str()
         .with_context(|| {
             format!(
-                "Directory path contains invalid UTF-8 characters: {}",
+                "Item path contains invalid UTF-8 characters: {}",
                 path.display()
             )
         })

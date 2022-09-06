@@ -11,4 +11,8 @@ pub struct Args {
     /// Destination directory
     #[clap(help = "Destination directory (to synchronize with the source directory)")]
     pub dest_dir: String,
+
+    /// Names to ignore
+    #[clap(short = 'i', long = "ignore", help = "Names to ignore when diffing")]
+    pub ignore: Vec<String>,
 }

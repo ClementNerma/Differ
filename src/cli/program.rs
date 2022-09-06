@@ -40,7 +40,7 @@ fn human_size(bytes: u64) -> String {
     format!("{:.2} GiB", bytes / 1024.0)
 }
 
-fn driver_from_arg(arg: &str) -> Result<Box<dyn Driver + Send + Sync>> {
+fn driver_from_arg(arg: &str) -> Result<(Box<dyn Driver + Send + Sync>, String)> {
     if let Some(arg) = arg.strip_prefix("sftp:") {
         let mut parts = arg.split('|');
         let mut split = parts
@@ -67,26 +67,34 @@ fn driver_from_arg(arg: &str) -> Result<Box<dyn Driver + Send + Sync>> {
             .next()
             .context("Please provide the path to the SSH private key file")?;
 
+        let path = parts
+            .next()
+            .context("Please provide a directory after SSH key files")?
+            .to_string();
+
         if parts.next().is_some() {
             bail!("Too many separators provided for SFTP driver");
         }
 
-        return Ok(Box::new(SftpDriver::connect(
-            address,
-            username,
-            Path::new(pub_key_path),
-            Path::new(priv_key_path),
-        )?));
+        return Ok((
+            Box::new(SftpDriver::connect(
+                address,
+                username,
+                Path::new(pub_key_path),
+                Path::new(priv_key_path),
+            )?),
+            path,
+        ));
     }
 
-    Ok(Box::new(FsDriver::new()))
+    Ok((Box::new(FsDriver::new()), arg.to_string()))
 }
 
 fn inner_main() -> Result<()> {
     let cmd = Args::parse();
 
-    let source_driver = driver_from_arg(&cmd.source_dir)?;
-    let dest_driver = driver_from_arg(&cmd.dest_dir)?;
+    let (source_driver, source_dir) = driver_from_arg(&cmd.source_dir)?;
+    let (dest_driver, dest_dir) = driver_from_arg(&cmd.dest_dir)?;
 
     let ignore = cmd
         .ignore
@@ -99,8 +107,8 @@ fn inner_main() -> Result<()> {
     // let started = Instant::now();
 
     let (source, dest) = std::thread::scope(|s| -> Result<(Snapshot, Snapshot)> {
-        let source = s.spawn(|| make_snapshot(source_driver.as_ref(), cmd.source_dir, &ignore));
-        let dest = s.spawn(|| make_snapshot(dest_driver.as_ref(), cmd.dest_dir, &ignore));
+        let source = s.spawn(|| make_snapshot(source_driver.as_ref(), source_dir, &ignore));
+        let dest = s.spawn(|| make_snapshot(dest_driver.as_ref(), dest_dir, &ignore));
 
         Ok((source.join().unwrap()?, dest.join().unwrap()?))
     })?;

@@ -1,4 +1,4 @@
-use std::{convert::TryInto, net::TcpStream, path::Path};
+use std::{collections::HashSet, convert::TryInto, net::TcpStream, path::Path};
 
 use anyhow::{bail, Context, Result};
 use ssh2::{Session, Sftp};
@@ -35,12 +35,20 @@ impl SftpDriver {
 }
 
 impl Driver for SftpDriver {
-    fn find_all(&self, dir: &str) -> Result<Vec<DriverItem>> {
-        let read_sub_dir = |dir: &str| -> Result<Vec<DriverItem>> {
+    fn find_all(&self, root: &str, ignore: &HashSet<&str>) -> Result<Vec<DriverItem>> {
+        let root = Path::new(root);
+
+        let read_sub_dir = |dir: &Path| -> Result<Vec<DriverItem>> {
             let mut items = vec![];
 
-            for (path, stat) in self.sftp.readdir(Path::new(dir))? {
+            for (item, stat) in self.sftp.readdir(Path::new(dir))? {
                 let metadata: DriverItemMetadata;
+
+                if ignore.contains(get_filename(&item)?) {
+                    continue;
+                }
+
+                let path = get_relative_utf8_path(root, &item)?.to_string();
 
                 if stat.is_dir() {
                     metadata = DriverItemMetadata::Directory;
@@ -49,36 +57,52 @@ impl Driver for SftpDriver {
                         modification_date: stat
                             .mtime
                             .with_context(|| {
-                                format!("Missing modification time on item: {}", path.display())
+                                format!("Missing modification time on item: {}", item.display())
                             })?
                             .try_into()
                             .with_context(|| {
                                 format!(
                                     "Invalid modification time found for item: {}",
-                                    path.display()
+                                    item.display()
                                 )
                             })?,
                         size: stat
                             .size
-                            .with_context(|| format!("Missing size on item: {}", path.display()))?,
+                            .with_context(|| format!("Missing size on item: {}", item.display()))?,
                     })
                 } else {
-                    bail!("Unknown item type at: {}", path.display());
+                    bail!("Unknown item type at: {}", item.display());
                 }
 
-                items.push(DriverItem {
-                    path: path
-                        .to_str()
-                        .with_context(|| {
-                            format!("File contains non-UTF-8 characters: {}", path.display())
-                        })?
-                        .to_string(),
-                    metadata,
-                });
+                items.push(DriverItem { path, metadata });
             }
             todo!()
         };
 
-        read_sub_dir(dir)
+        read_sub_dir(root)
     }
+}
+
+fn get_relative_utf8_path<'a>(path: &'a Path, source: &Path) -> Result<&'a str> {
+    path.strip_prefix(source)
+        .context("Internal error: failed to strip prefix")?
+        .to_str()
+        .with_context(|| {
+            format!(
+                "Item path contains invalid UTF-8 characters: {}",
+                path.display()
+            )
+        })
+}
+
+fn get_filename(path: &Path) -> Result<&str> {
+    path.file_name()
+        .with_context(|| format!("Filename is missing on path: {}", path.display()))?
+        .to_str()
+        .with_context(|| {
+            format!(
+                "Item path contains invalid UTF-8 characters: {}",
+                path.display()
+            )
+        })
 }

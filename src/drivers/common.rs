@@ -10,8 +10,12 @@ pub struct Snapshot {
     pub items: Vec<DriverItem>,
 }
 
-pub fn make_snapshot(driver: &dyn Driver, path: String) -> Result<Snapshot> {
-    let items = driver.find_all(&path)?;
+pub fn make_snapshot(
+    driver: &dyn Driver,
+    path: String,
+    ignore: &HashSet<&str>,
+) -> Result<Snapshot> {
+    let items = driver.find_all(&path, ignore)?;
 
     let mut uniq = HashSet::new();
 
@@ -25,7 +29,7 @@ pub fn make_snapshot(driver: &dyn Driver, path: String) -> Result<Snapshot> {
 }
 
 pub trait Driver {
-    fn find_all(&self, dir: &str) -> Result<Vec<DriverItem>>;
+    fn find_all(&self, dir: &str, ignore: &HashSet<&str>) -> Result<Vec<DriverItem>>;
 }
 
 #[derive(Debug)]
