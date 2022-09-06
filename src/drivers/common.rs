@@ -57,13 +57,6 @@ impl DriverItemMetadata {
             Self::File(_) => false,
         }
     }
-
-    pub fn is_file(&self) -> bool {
-        match self {
-            Self::Directory => false,
-            Self::File(_) => true,
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]

@@ -12,17 +12,9 @@ impl Diff {
         Self(items)
     }
 
-    pub fn items(&self) -> &[DiffItem] {
-        self.0.as_slice()
-    }
-
     pub fn into_items(self) -> Vec<DiffItem> {
         self.0
     }
-
-    // pub fn into_items(self) -> Vec<DiffItem> {
-    //     self.0
-    // }
 
     pub fn sort(&mut self) {
         self.0.sort()
@@ -78,39 +70,6 @@ pub struct DiffItemTypeChanged {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct DiffItemDeleted {
     pub prev: DriverItemMetadata,
-}
-
-impl DiffType {
-    pub fn get_new_metadata(self) -> Option<DriverItemMetadata> {
-        match self {
-            Self::Added(DiffItemAdded { new }) => Some(new),
-            Self::Modified(DiffItemModified { prev: _, new }) => {
-                Some(DriverItemMetadata::File(new))
-            }
-            Self::TypeChanged(DiffItemTypeChanged { prev: _, new }) => Some(new),
-            Self::Deleted(DiffItemDeleted { prev: _ }) => None,
-        }
-    }
-
-    pub fn get_prev_metadata(self) -> Option<DriverItemMetadata> {
-        match self {
-            Self::Added(DiffItemAdded { new: _ }) => None,
-            Self::Modified(DiffItemModified { prev, new: _ }) => {
-                Some(DriverItemMetadata::File(prev))
-            }
-            Self::TypeChanged(DiffItemTypeChanged { prev, new: _ }) => Some(prev),
-            Self::Deleted(DiffItemDeleted { prev }) => Some(prev),
-        }
-    }
-
-    pub fn get_relevant_metadata(self) -> DriverItemMetadata {
-        match self {
-            Self::Added(DiffItemAdded { new }) => new,
-            Self::Modified(DiffItemModified { prev: _, new }) => DriverItemMetadata::File(new),
-            Self::TypeChanged(DiffItemTypeChanged { prev: _, new }) => new,
-            Self::Deleted(DiffItemDeleted { prev }) => prev,
-        }
-    }
 }
 
 pub fn build_diff(source: Snapshot, dest_dir: Snapshot) -> Diff {
