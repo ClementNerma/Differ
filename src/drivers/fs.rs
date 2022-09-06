@@ -52,7 +52,9 @@ impl Driver for FsDriver {
                         metadata: DriverItemMetadata::Directory,
                     })
                 } else if path.is_file() {
-                    let metadata = path.metadata().context("Failed to get file's metadata")?;
+                    let metadata = path.metadata().with_context(|| {
+                        format!("Failed to get file's metadata for: {}", path.display())
+                    })?;
 
                     // TODO: get real size
                     Ok(DriverItem {
