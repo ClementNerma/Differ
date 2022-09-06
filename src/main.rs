@@ -2,19 +2,14 @@
 #![forbid(unused_must_use)]
 
 mod cmd;
-mod diff;
+pub mod diffing;
 mod logging;
-mod snapshot;
 
-use std::path::Path;
-
-use crate::{
-    diff::{build_diff, DiffType},
-    snapshot::make_snapshot,
-};
+use crate::diffing::{build_diff, make_snapshot, DiffType};
 use clap::StructOpt;
 use cmd::Args;
 use colored::Colorize;
+use std::path::Path;
 
 fn human_size(bytes: u64) -> String {
     if bytes < 1024 {
