@@ -10,14 +10,19 @@ pub struct SftpDriver {
 }
 
 impl SftpDriver {
-    pub fn connect(address: &str, username: &str) -> Result<Self> {
+    pub fn connect(
+        address: &str,
+        username: &str,
+        pub_key_file: &Path,
+        priv_key_file: &Path,
+    ) -> Result<Self> {
         let tcp = TcpStream::connect(address)?;
 
         let mut session = Session::new().unwrap();
         session.set_tcp_stream(tcp);
         session.handshake().unwrap();
 
-        session.userauth_agent(username)?;
+        session.userauth_pubkey_file(username, Some(pub_key_file), priv_key_file, None)?;
 
         if !session.authenticated() {
             bail!("Session is not authenticated!");

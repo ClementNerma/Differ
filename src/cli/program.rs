@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use super::cmd::Args;
 use crate::drivers::{sftp::SftpDriver, Driver};
 use crate::info;
@@ -38,20 +40,41 @@ fn human_size(bytes: u64) -> String {
 
 fn driver_from_arg(arg: &str) -> Result<Box<dyn Driver + Send + Sync>> {
     if let Some(arg) = arg.strip_prefix("sftp:") {
-        let mut split = arg.split('@');
+        let mut parts = arg.split('|');
+        let mut split = parts
+            .next()
+            .context("Please provide a username for SFTP driver")?
+            .split('@');
 
         let username = split
             .next()
-            .context("Please provide a username for SFTP driver (<username>@<address>)")?;
+            .context("Please provide a username for SFTP driver")?;
         let address = split
             .next()
-            .context("Please provide an address for SFTP driver (<username>@<address>)")?;
+            .context("Please provide an address for SFTP driver")?;
 
         if split.next().is_some() {
             bail!("Only one '@' is allowed in argument for SFTP driver");
         }
 
-        return Ok(Box::new(SftpDriver::connect(address, username)?));
+        let pub_key_path = parts
+            .next()
+            .context("Please provide the path to the SSH public key file")?;
+
+        let priv_key_path = parts
+            .next()
+            .context("Please provide the path to the SSH private key file")?;
+
+        if parts.next().is_some() {
+            bail!("Too many separators provided for SFTP driver");
+        }
+
+        return Ok(Box::new(SftpDriver::connect(
+            address,
+            username,
+            Path::new(pub_key_path),
+            Path::new(priv_key_path),
+        )?));
     }
 
     Ok(Box::new(FsDriver::new()))
