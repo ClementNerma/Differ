@@ -60,7 +60,7 @@ impl Driver for FsDriver {
                     Ok(DriverItem {
                         path: get_relative_utf8_path(path, root)?.to_string(),
                         metadata: DriverItemMetadata::File(DriverFileMetadata {
-                            creation_date: metadata.ctime(),
+                            // creation_date: metadata.ctime(),
                             modification_date: metadata.mtime(),
                             size: metadata.len(),
                         }),

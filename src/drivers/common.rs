@@ -75,7 +75,7 @@ impl DriverItemMetadata {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct DriverFileMetadata {
-    pub creation_date: i64,
+    // pub creation_date: i64,
     pub modification_date: i64,
     pub size: u64,
 }
