@@ -22,16 +22,16 @@ impl Default for FsDriver {
 }
 
 impl Driver for FsDriver {
-    fn canonicalize(&self, path: &str) -> Result<String> {
-        Ok(canonicalize(path)
-            .with_context(|| format!("Failed to canonicalize base directory at: {path}"))?
-            .to_str()
-            .with_context(|| format!("Base directory contains invalid UTF-8 characters: {path}"))?
-            .to_string())
-    }
-
     fn find_all(&self, root: &str) -> Result<Vec<DriverItem>> {
-        let root = Path::new(root);
+        let root = canonicalize(root)
+            .with_context(|| format!("Failed to canonicalize base directory at: {root}"))?;
+
+        let root = Path::new(root.to_str().with_context(|| {
+            format!(
+                "Base directory contains invalid UTF-8 characters: {}",
+                root.display()
+            )
+        })?);
 
         if !root.is_dir() {
             bail!("Root directory was not found!")

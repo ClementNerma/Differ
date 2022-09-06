@@ -10,9 +10,7 @@ pub struct Snapshot {
     pub items: Vec<DriverItem>,
 }
 
-pub fn make_snapshot(driver: &dyn Driver, path: &str) -> Result<Snapshot> {
-    let path = driver.canonicalize(path)?;
-
+pub fn make_snapshot(driver: &dyn Driver, path: String) -> Result<Snapshot> {
     let items = driver.find_all(&path)?;
 
     let mut uniq = HashSet::new();
@@ -28,7 +26,6 @@ pub fn make_snapshot(driver: &dyn Driver, path: &str) -> Result<Snapshot> {
 
 pub trait Driver {
     fn find_all(&self, dir: &str) -> Result<Vec<DriverItem>>;
-    fn canonicalize(&self, path: &str) -> Result<String>;
 }
 
 #[derive(Debug)]

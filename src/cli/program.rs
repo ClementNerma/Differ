@@ -91,8 +91,8 @@ fn inner_main() -> Result<()> {
     // let started = Instant::now();
 
     let (source, dest) = std::thread::scope(|s| {
-        let source = s.spawn(|| make_snapshot(source_driver.as_ref(), &cmd.source_dir).unwrap());
-        let dest = s.spawn(|| make_snapshot(dest_driver.as_ref(), &cmd.dest_dir).unwrap());
+        let source = s.spawn(|| make_snapshot(source_driver.as_ref(), cmd.source_dir).unwrap());
+        let dest = s.spawn(|| make_snapshot(dest_driver.as_ref(), cmd.dest_dir).unwrap());
 
         (source.join().unwrap(), dest.join().unwrap())
     });

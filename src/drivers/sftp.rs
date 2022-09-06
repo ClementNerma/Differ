@@ -35,10 +35,6 @@ impl SftpDriver {
 }
 
 impl Driver for SftpDriver {
-    fn canonicalize(&self, path: &str) -> Result<String> {
-        todo!()
-    }
-
     fn find_all(&self, dir: &str) -> Result<Vec<DriverItem>> {
         let read_sub_dir = |dir: &str| -> Result<Vec<DriverItem>> {
             let mut items = vec![];
