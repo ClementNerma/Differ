@@ -1,4 +1,6 @@
-use anyhow::Result;
+use std::collections::HashSet;
+
+use anyhow::{bail, Result};
 
 #[derive(Debug)]
 pub struct Snapshot {
@@ -13,6 +15,14 @@ pub fn make_snapshot(driver: &dyn Driver, path: &str) -> Result<Snapshot> {
     let path = driver.canonicalize(path)?;
 
     let items = driver.find_all(&path)?;
+
+    let mut uniq = HashSet::new();
+
+    for item in &items {
+        if !uniq.insert(&item.path) {
+            bail!("Duplicate item in driver's results: {}", item.path);
+        }
+    }
 
     Ok(Snapshot {
         driver_id: driver.id(),
