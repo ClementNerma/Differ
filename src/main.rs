@@ -39,23 +39,31 @@ fn main() {
 
     let driver = FsDriver::new();
 
-    info!("Building source directory snapshot...");
-    let source = make_snapshot(
-        &driver,
-        cmd.source_dir
-            .to_str()
-            .expect("Source path contains non-UTF-8 characters"),
-    )
-    .unwrap();
+    info!("Building snapshots for source and destination...");
 
-    info!("Building backup directory snapshot...");
-    let backup = make_snapshot(
-        &driver,
-        cmd.backup_dir
-            .to_str()
-            .expect("Backup path contains non-UTF-8 characters"),
-    )
-    .unwrap();
+    let (source, backup) = std::thread::scope(|s| {
+        let source = s.spawn(|| {
+            make_snapshot(
+                &driver,
+                cmd.source_dir
+                    .to_str()
+                    .expect("Source path contains non-UTF-8 characters"),
+            )
+            .unwrap()
+        });
+
+        let backup = s.spawn(|| {
+            make_snapshot(
+                &driver,
+                cmd.backup_dir
+                    .to_str()
+                    .expect("Backup path contains non-UTF-8 characters"),
+            )
+            .unwrap()
+        });
+
+        (source.join().unwrap(), backup.join().unwrap())
+    });
 
     info!("Diffing...");
     let mut diff = build_diff(source, backup);
