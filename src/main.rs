@@ -58,7 +58,7 @@ fn main() {
             "{} {}{} {}",
             symbol,
             item.path.display(),
-            if matches!(item.status.get_new_metadata(), Some(m) if m.is_dir()) {
+            if item.status.get_relevant_metadata().is_dir() {
                 "/"
             } else {
                 ""

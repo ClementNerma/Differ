@@ -25,7 +25,7 @@ impl Diff {
     }
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct DiffItem {
     pub path: PathBuf,
     pub status: DiffType,
@@ -46,7 +46,7 @@ impl Ord for DiffItem {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum DiffType {
     Added {
         new: SnapshotItemMetadata,
@@ -80,6 +80,15 @@ impl DiffType {
             Self::Modified { prev, new: _ } => Some(prev),
             Self::TypeChanged { prev, new: _ } => Some(prev),
             Self::Deleted { prev } => Some(prev),
+        }
+    }
+
+    pub fn get_relevant_metadata(&self) -> &SnapshotItemMetadata {
+        match self {
+            Self::Added { new } => new,
+            Self::Modified { prev: _, new } => new,
+            Self::TypeChanged { prev: _, new } => new,
+            Self::Deleted { prev } => prev,
         }
     }
 }
