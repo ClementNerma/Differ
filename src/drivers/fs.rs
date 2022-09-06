@@ -15,6 +15,12 @@ impl FsDriver {
     }
 }
 
+impl Default for FsDriver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Driver for FsDriver {
     fn id(&self) -> String {
         "fs:local".to_string()
