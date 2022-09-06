@@ -5,7 +5,7 @@ mod cmd;
 pub mod diffing;
 mod logging;
 
-use crate::diffing::{build_diff, make_snapshot, DiffType};
+use crate::diffing::{build_diff, make_snapshot, CategorizedDiff, SnapshotItemMetadata};
 use clap::StructOpt;
 use cmd::Args;
 use colored::Colorize;
@@ -44,39 +44,99 @@ fn main() {
     let mut diff = build_diff(source, backup);
     diff.sort();
 
-    println!();
+    let cat = CategorizedDiff::new(diff);
 
-    for item in diff.items() {
-        let symbol = match item.status {
-            DiffType::Added { new: _ } => "+",
-            DiffType::Modified { prev: _, new: _ } => "~",
-            DiffType::TypeChanged { prev: _, new: _ } => "!",
-            DiffType::Deleted { prev: _ } => "-",
-        };
+    if !cat.added.is_empty() {
+        println!("Added:");
 
-        let message = format!(
-            "{} {}{} {}",
-            symbol,
-            item.path.display(),
-            if item.status.get_relevant_metadata().is_dir() {
-                "/"
-            } else {
-                ""
-            },
-            item.status
-                .get_new_metadata()
-                .and_then(|m| m.size())
-                .map(|s| format!("({})", human_size(s)))
-                .unwrap_or(String::new())
-        );
+        for (path, added) in &cat.added {
+            match added.new {
+                SnapshotItemMetadata::Directory => {
+                    println!(" {}", format!("{}/", path.to_string_lossy()).bright_green())
+                }
+                SnapshotItemMetadata::File(m) => println!(
+                    " {} {}",
+                    path.to_string_lossy().bright_green(),
+                    format!("({})", human_size(m.size)).bright_yellow()
+                ),
+            }
+        }
 
-        let message = match item.status {
-            DiffType::Added { new: _ } => message.bright_green(),
-            DiffType::Modified { prev: _, new: _ } => message.bright_yellow(),
-            DiffType::TypeChanged { prev: _, new: _ } => message.bright_yellow(),
-            DiffType::Deleted { prev: _ } => message.bright_red(),
-        };
-
-        println!("{}", message);
+        println!();
     }
+
+    if !cat.modified.is_empty() {
+        println!("Modified:");
+
+        for (path, modified) in &cat.modified {
+            println!(
+                " {} {}",
+                path.to_string_lossy().bright_yellow(),
+                format!("({})", human_size(modified.new.size)).bright_yellow()
+            );
+        }
+
+        println!();
+    }
+
+    if !cat.type_changed.is_empty() {
+        println!("Type changed:");
+
+        let type_letter = |m: SnapshotItemMetadata| match m {
+            SnapshotItemMetadata::Directory => "D",
+            SnapshotItemMetadata::File(_) => "F",
+        };
+
+        for (path, type_changed) in &cat.type_changed {
+            let message = format!(
+                " {}{} ({} => {})",
+                path.to_string_lossy(),
+                if type_changed.new.is_dir() { "/" } else { "" },
+                type_letter(type_changed.prev),
+                type_letter(type_changed.new)
+            );
+
+            println!("{}", message.bright_yellow());
+        }
+
+        println!();
+    }
+
+    if !cat.deleted.is_empty() {
+        println!("Deleted:");
+
+        for (path, deleted) in &cat.deleted {
+            match deleted.prev {
+                SnapshotItemMetadata::Directory => {
+                    println!(" {}", format!("{}/", path.to_string_lossy()).bright_red())
+                }
+                SnapshotItemMetadata::File(m) => println!(
+                    " {} {}",
+                    path.to_string_lossy().bright_red(),
+                    format!("({})", human_size(m.size)).bright_yellow()
+                ),
+            }
+        }
+
+        println!();
+    }
+
+    let transfer_count = cat.added.len() + cat.modified.len() + cat.type_changed.len();
+    let delete_count = cat.type_changed.len() + cat.deleted.len();
+    let transfer_size = cat
+        .added
+        .iter()
+        .fold(0, |acc, (_, i)| acc + i.new.size().unwrap_or(0))
+        + cat.modified.iter().fold(0, |acc, (_, i)| acc + i.new.size)
+        + cat
+            .type_changed
+            .iter()
+            .fold(0, |acc, (_, i)| acc + i.new.size().unwrap_or(0));
+
+    println!(
+        "Found a total of {} items to transfer and {} to delete for a total of {}.",
+        transfer_count.to_string().bright_green(),
+        delete_count.to_string().bright_red(),
+        human_size(transfer_size).bright_yellow()
+    );
 }

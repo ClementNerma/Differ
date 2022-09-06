@@ -1,4 +1,4 @@
-use super::{Snapshot, SnapshotItemMetadata};
+use super::{Snapshot, SnapshotComparableFileMetadata, SnapshotItemMetadata};
 use std::{
     cmp::Ordering,
     collections::{HashMap, HashSet},
@@ -14,6 +14,10 @@ impl Diff {
 
     pub fn items(&self) -> &[DiffItem] {
         self.0.as_slice()
+    }
+
+    pub fn into_items(self) -> Vec<DiffItem> {
+        self.0
     }
 
     // pub fn into_items(self) -> Vec<DiffItem> {
@@ -48,47 +52,63 @@ impl Ord for DiffItem {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum DiffType {
-    Added {
-        new: SnapshotItemMetadata,
-    },
-    Modified {
-        prev: SnapshotItemMetadata,
-        new: SnapshotItemMetadata,
-    },
-    TypeChanged {
-        prev: SnapshotItemMetadata,
-        new: SnapshotItemMetadata,
-    }, // File => Dir / Dir => File
-    Deleted {
-        prev: SnapshotItemMetadata,
-    },
+    Added(DiffItemAdded),
+    Modified(DiffItemModified),
+    TypeChanged(DiffItemTypeChanged), // File => Dir / Dir => File
+    Deleted(DiffItemDeleted),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct DiffItemAdded {
+    pub new: SnapshotItemMetadata,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct DiffItemModified {
+    pub prev: SnapshotComparableFileMetadata,
+    pub new: SnapshotComparableFileMetadata,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct DiffItemTypeChanged {
+    pub prev: SnapshotItemMetadata,
+    pub new: SnapshotItemMetadata,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct DiffItemDeleted {
+    pub prev: SnapshotItemMetadata,
 }
 
 impl DiffType {
-    pub fn get_new_metadata(&self) -> Option<&SnapshotItemMetadata> {
+    pub fn get_new_metadata(self) -> Option<SnapshotItemMetadata> {
         match self {
-            Self::Added { new } => Some(new),
-            Self::Modified { prev: _, new } => Some(new),
-            Self::TypeChanged { prev: _, new } => Some(new),
-            Self::Deleted { prev: _ } => None,
+            Self::Added(DiffItemAdded { new }) => Some(new),
+            Self::Modified(DiffItemModified { prev: _, new }) => {
+                Some(SnapshotItemMetadata::File(new))
+            }
+            Self::TypeChanged(DiffItemTypeChanged { prev: _, new }) => Some(new),
+            Self::Deleted(DiffItemDeleted { prev: _ }) => None,
         }
     }
 
-    pub fn get_prev_metadata(&self) -> Option<&SnapshotItemMetadata> {
+    pub fn get_prev_metadata(self) -> Option<SnapshotItemMetadata> {
         match self {
-            Self::Added { new: _ } => None,
-            Self::Modified { prev, new: _ } => Some(prev),
-            Self::TypeChanged { prev, new: _ } => Some(prev),
-            Self::Deleted { prev } => Some(prev),
+            Self::Added(DiffItemAdded { new: _ }) => None,
+            Self::Modified(DiffItemModified { prev, new: _ }) => {
+                Some(SnapshotItemMetadata::File(prev))
+            }
+            Self::TypeChanged(DiffItemTypeChanged { prev, new: _ }) => Some(prev),
+            Self::Deleted(DiffItemDeleted { prev }) => Some(prev),
         }
     }
 
-    pub fn get_relevant_metadata(&self) -> &SnapshotItemMetadata {
+    pub fn get_relevant_metadata(self) -> SnapshotItemMetadata {
         match self {
-            Self::Added { new } => new,
-            Self::Modified { prev: _, new } => new,
-            Self::TypeChanged { prev: _, new } => new,
-            Self::Deleted { prev } => prev,
+            Self::Added(DiffItemAdded { new }) => new,
+            Self::Modified(DiffItemModified { prev: _, new }) => SnapshotItemMetadata::File(new),
+            Self::TypeChanged(DiffItemTypeChanged { prev: _, new }) => new,
+            Self::Deleted(DiffItemDeleted { prev }) => prev,
         }
     }
 }
@@ -107,9 +127,9 @@ pub fn build_diff(source: Snapshot, backup_dir: Snapshot) -> Diff {
             .difference(&backed_up_items_paths)
             .map(|item| DiffItem {
                 path: PathBuf::from(item),
-                status: DiffType::Added {
+                status: DiffType::Added(DiffItemAdded {
                     new: **source_items.get(*item).unwrap(),
-                },
+                }),
             }),
     );
 
@@ -118,9 +138,9 @@ pub fn build_diff(source: Snapshot, backup_dir: Snapshot) -> Diff {
             .difference(&source_items_paths)
             .map(|item| DiffItem {
                 path: PathBuf::from(item),
-                status: DiffType::Deleted {
+                status: DiffType::Deleted(DiffItemDeleted {
                     prev: **backed_up_items.get(*item).unwrap(),
-                },
+                }),
             }),
     );
 
@@ -136,7 +156,7 @@ pub fn build_diff(source: Snapshot, backup_dir: Snapshot) -> Diff {
                     .find(|c| c.path == source_item.path)
                     .unwrap();
 
-                match (&source_item.metadata, &backed_up_item.metadata) {
+                match (source_item.metadata, backed_up_item.metadata) {
                     // Both directories = no change
                     (SnapshotItemMetadata::Directory, SnapshotItemMetadata::Directory) => None,
                     // Source item is directory and backed up item is file or the opposite = type changed
@@ -144,32 +164,26 @@ pub fn build_diff(source: Snapshot, backup_dir: Snapshot) -> Diff {
                     | (SnapshotItemMetadata::File { .. }, SnapshotItemMetadata::Directory) => {
                         Some(DiffItem {
                             path: PathBuf::from(&source_item.path),
-                            status: DiffType::TypeChanged {
+                            status: DiffType::TypeChanged(DiffItemTypeChanged {
                                 prev: backed_up_item.metadata,
                                 new: source_item.metadata,
-                            },
+                            }),
                         })
                     }
                     // Otherwise, compare their metadata to see if something changed
                     (
-                        SnapshotItemMetadata::File {
-                            comparable: source_data,
-                            ..
-                        },
-                        SnapshotItemMetadata::File {
-                            comparable: backed_up_data,
-                            ..
-                        },
+                        SnapshotItemMetadata::File(source_data),
+                        SnapshotItemMetadata::File(backed_up_data),
                     ) => {
                         if source_data == backed_up_data {
                             None
                         } else {
                             Some(DiffItem {
                                 path: PathBuf::from(&source_item.path),
-                                status: DiffType::Modified {
-                                    prev: backed_up_item.metadata,
-                                    new: source_item.metadata,
-                                },
+                                status: DiffType::Modified(DiffItemModified {
+                                    prev: backed_up_data,
+                                    new: source_data,
+                                }),
                             })
                         }
                     }

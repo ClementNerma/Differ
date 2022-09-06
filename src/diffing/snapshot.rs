@@ -24,46 +24,35 @@ pub struct SnapshotItem {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum SnapshotItemMetadata {
     Directory,
-    File {
-        creation_date: i64,
-        comparable: SnapshotComparableFileMetadata,
-    },
+    File(SnapshotComparableFileMetadata),
 }
 
 impl SnapshotItemMetadata {
     pub fn size(&self) -> Option<u64> {
         match self {
             Self::Directory => None,
-            Self::File {
-                creation_date: _,
-                comparable,
-            } => Some(comparable.size),
+            Self::File(m) => Some(m.size),
         }
     }
 
     pub fn is_dir(&self) -> bool {
         match self {
             Self::Directory => true,
-            Self::File {
-                creation_date: _,
-                comparable: _,
-            } => false,
+            Self::File(_) => false,
         }
     }
 
     pub fn is_file(&self) -> bool {
         match self {
             Self::Directory => false,
-            Self::File {
-                creation_date: _,
-                comparable: _,
-            } => true,
+            Self::File(_) => true,
         }
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct SnapshotComparableFileMetadata {
+    pub creation_date: i64,
     pub modif_date: i64,
     pub size: u64,
 }
@@ -111,13 +100,11 @@ pub fn make_snapshot(base: &Path) -> Result<Snapshot> {
                 // TODO: get real size
                 Ok(SnapshotItem {
                     path: get_relative_utf8_path(path, base)?.to_string(),
-                    metadata: SnapshotItemMetadata::File {
+                    metadata: SnapshotItemMetadata::File(SnapshotComparableFileMetadata {
                         creation_date: metadata.ctime(),
-                        comparable: SnapshotComparableFileMetadata {
-                            modif_date: metadata.mtime(),
-                            size: metadata.len(),
-                        },
-                    },
+                        modif_date: metadata.mtime(),
+                        size: metadata.len(),
+                    }),
                 })
             } else {
                 bail!("Encountered unknown item type at: {}", path.display())
