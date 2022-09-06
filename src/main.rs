@@ -69,11 +69,11 @@ fn main() {
         for (path, added) in &cat.added {
             match added.new {
                 DriverItemMetadata::Directory => {
-                    println!(" {}", format!("{}/", path.to_string_lossy()).bright_green())
+                    println!(" {}", format!("{}/", path).bright_green())
                 }
                 DriverItemMetadata::File(m) => println!(
                     " {} {}",
-                    path.to_string_lossy().bright_green(),
+                    path.bright_green(),
                     format!("({})", human_size(m.size)).bright_yellow()
                 ),
             }
@@ -87,9 +87,8 @@ fn main() {
 
         for (path, modified) in &cat.modified {
             println!(
-                " {} {}",
-                path.to_string_lossy().bright_yellow(),
-                format!("({})", human_size(modified.new.size)).bright_yellow()
+                "{}",
+                format!(" {} ({})", path, human_size(modified.new.size)).bright_yellow()
             );
         }
 
@@ -107,7 +106,7 @@ fn main() {
         for (path, type_changed) in &cat.type_changed {
             let message = format!(
                 " {}{} ({} => {})",
-                path.to_string_lossy(),
+                path,
                 if type_changed.new.is_dir() { "/" } else { "" },
                 type_letter(type_changed.prev),
                 type_letter(type_changed.new)
@@ -125,11 +124,11 @@ fn main() {
         for (path, deleted) in &cat.deleted {
             match deleted.prev {
                 DriverItemMetadata::Directory => {
-                    println!(" {}", format!("{}/", path.to_string_lossy()).bright_red())
+                    println!(" {}", format!("{path}/").bright_red())
                 }
                 DriverItemMetadata::File(m) => println!(
                     " {} {}",
-                    path.to_string_lossy().bright_red(),
+                    path.bright_red(),
                     format!("({})", human_size(m.size)).bright_yellow()
                 ),
             }

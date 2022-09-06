@@ -3,7 +3,6 @@ use crate::drivers::{DriverFileMetadata, DriverItemMetadata, Snapshot};
 use std::{
     cmp::Ordering,
     collections::{HashMap, HashSet},
-    path::PathBuf,
 };
 
 pub struct Diff(Vec<DiffItem>);
@@ -32,7 +31,7 @@ impl Diff {
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct DiffItem {
-    pub path: PathBuf,
+    pub path: String,
     pub status: DiffType,
 }
 
@@ -127,7 +126,7 @@ pub fn build_diff(source: Snapshot, backup_dir: Snapshot) -> Diff {
         source_items_paths
             .difference(&backed_up_items_paths)
             .map(|item| DiffItem {
-                path: PathBuf::from(item),
+                path: String::clone(item),
                 status: DiffType::Added(DiffItemAdded {
                     new: **source_items.get(*item).unwrap(),
                 }),
@@ -138,7 +137,7 @@ pub fn build_diff(source: Snapshot, backup_dir: Snapshot) -> Diff {
         backed_up_items_paths
             .difference(&source_items_paths)
             .map(|item| DiffItem {
-                path: PathBuf::from(item),
+                path: String::clone(item),
                 status: DiffType::Deleted(DiffItemDeleted {
                     prev: **backed_up_items.get(*item).unwrap(),
                 }),
@@ -164,7 +163,7 @@ pub fn build_diff(source: Snapshot, backup_dir: Snapshot) -> Diff {
                     (DriverItemMetadata::Directory, DriverItemMetadata::File { .. })
                     | (DriverItemMetadata::File { .. }, DriverItemMetadata::Directory) => {
                         Some(DiffItem {
-                            path: PathBuf::from(&source_item.path),
+                            path: source_item.path.clone(),
                             status: DiffType::TypeChanged(DiffItemTypeChanged {
                                 prev: backed_up_item.metadata,
                                 new: source_item.metadata,
@@ -180,7 +179,7 @@ pub fn build_diff(source: Snapshot, backup_dir: Snapshot) -> Diff {
                             None
                         } else {
                             Some(DiffItem {
-                                path: PathBuf::from(&source_item.path),
+                                path: source_item.path.clone(),
                                 status: DiffType::Modified(DiffItemModified {
                                     prev: backed_up_data,
                                     new: source_data,

@@ -1,14 +1,12 @@
-use std::path::PathBuf;
-
 use super::{
     Diff, DiffItemAdded, DiffItemDeleted, DiffItemModified, DiffItemTypeChanged, DiffType,
 };
 
 pub struct CategorizedDiff {
-    pub added: Vec<(PathBuf, DiffItemAdded)>,
-    pub modified: Vec<(PathBuf, DiffItemModified)>,
-    pub type_changed: Vec<(PathBuf, DiffItemTypeChanged)>,
-    pub deleted: Vec<(PathBuf, DiffItemDeleted)>,
+    pub added: Vec<(String, DiffItemAdded)>,
+    pub modified: Vec<(String, DiffItemModified)>,
+    pub type_changed: Vec<(String, DiffItemTypeChanged)>,
+    pub deleted: Vec<(String, DiffItemDeleted)>,
 }
 
 impl CategorizedDiff {

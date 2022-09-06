@@ -12,9 +12,11 @@ pub struct Snapshot {
 pub fn make_snapshot(driver: &dyn Driver, path: &str) -> Result<Snapshot> {
     let path = driver.canonicalize(path)?;
 
+    let items = driver.find_all(&path)?;
+
     Ok(Snapshot {
         driver_id: driver.id(),
-        items: driver.find_all(&path)?,
+        items,
         path,
     })
 }
