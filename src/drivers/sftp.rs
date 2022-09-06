@@ -76,7 +76,8 @@ impl Driver for SftpDriver {
 
                 items.push(DriverItem { path, metadata });
             }
-            todo!()
+
+            Ok(items)
         };
 
         read_sub_dir(root)
