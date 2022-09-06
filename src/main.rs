@@ -6,6 +6,8 @@ pub mod diffing;
 pub mod drivers;
 mod logging;
 
+// use std::time::Instant;
+
 use crate::{
     diffing::{build_diff, CategorizedDiff},
     drivers::{fs::FsDriver, make_snapshot, DriverItemMetadata},
@@ -41,6 +43,8 @@ fn main() {
 
     info!("Building snapshots for source and destination...");
 
+    // let started = Instant::now();
+
     let (source, backup) = std::thread::scope(|s| {
         let source = s.spawn(|| {
             make_snapshot(
@@ -65,7 +69,10 @@ fn main() {
         (source.join().unwrap(), backup.join().unwrap())
     });
 
-    info!("Diffing...");
+    // println!("Snapshots built in {}s.", started.elapsed().as_secs());
+
+    // let started = Instant::now();
+
     let mut diff = build_diff(source, backup);
     diff.sort();
 
@@ -144,6 +151,8 @@ fn main() {
 
         println!();
     }
+
+    // println!("Diffing made in {}s.", started.elapsed().as_secs());
 
     let transfer_count = cat.added.len() + cat.modified.len() + cat.type_changed.len();
     let delete_count = cat.type_changed.len() + cat.deleted.len();
