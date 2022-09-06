@@ -51,7 +51,7 @@ pub enum DiffType {
     Added {
         new: SnapshotItemMetadata,
     },
-    Changed {
+    Modified {
         prev: SnapshotItemMetadata,
         new: SnapshotItemMetadata,
     },
@@ -68,7 +68,7 @@ impl DiffType {
     pub fn get_new_metadata(&self) -> Option<&SnapshotItemMetadata> {
         match self {
             Self::Added { new } => Some(new),
-            Self::Changed { prev: _, new } => Some(new),
+            Self::Modified { prev: _, new } => Some(new),
             Self::TypeChanged { prev: _, new } => Some(new),
             Self::Deleted { prev: _ } => None,
         }
@@ -77,7 +77,7 @@ impl DiffType {
     pub fn get_prev_metadata(&self) -> Option<&SnapshotItemMetadata> {
         match self {
             Self::Added { new: _ } => None,
-            Self::Changed { prev, new: _ } => Some(prev),
+            Self::Modified { prev, new: _ } => Some(prev),
             Self::TypeChanged { prev, new: _ } => Some(prev),
             Self::Deleted { prev } => Some(prev),
         }
@@ -157,7 +157,7 @@ pub fn build_diff(source: Snapshot, backup_dir: Snapshot) -> Diff {
                         } else {
                             Some(DiffItem {
                                 path: PathBuf::from(&source_item.path),
-                                status: DiffType::Changed {
+                                status: DiffType::Modified {
                                     prev: backed_up_item.metadata,
                                     new: source_item.metadata,
                                 },

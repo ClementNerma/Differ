@@ -48,7 +48,7 @@ fn main() {
     for item in diff.items() {
         let symbol = match item.status {
             DiffType::Added { new: _ } => "+",
-            DiffType::Changed { prev: _, new: _ } => "~",
+            DiffType::Modified { prev: _, new: _ } => "~",
             DiffType::TypeChanged { prev: _, new: _ } => "!",
             DiffType::Deleted { prev: _ } => "-",
         };
@@ -71,7 +71,7 @@ fn main() {
 
         let message = match item.status {
             DiffType::Added { new: _ } => message.bright_green(),
-            DiffType::Changed { prev: _, new: _ } => message.bright_yellow(),
+            DiffType::Modified { prev: _, new: _ } => message.bright_yellow(),
             DiffType::TypeChanged { prev: _, new: _ } => message.bright_yellow(),
             DiffType::Deleted { prev: _ } => message.bright_red(),
         };
