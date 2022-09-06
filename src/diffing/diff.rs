@@ -168,9 +168,7 @@ pub fn build_diff(source: Snapshot, backup_dir: Snapshot) -> Diff {
             }),
     );
 
-    let mut diff = Diff::new(diff);
-    diff.sort();
-    diff
+    Diff::new(diff)
 }
 
 fn build_item_names_hashmap(snapshot: &Snapshot) -> HashMap<&String, &SnapshotItemMetadata> {

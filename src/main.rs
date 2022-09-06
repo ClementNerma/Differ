@@ -41,7 +41,8 @@ fn main() {
     let backup = make_snapshot(Path::new(&cmd.backup_dir)).unwrap();
 
     info!("Diffing...");
-    let diff = build_diff(source, backup);
+    let mut diff = build_diff(source, backup);
+    diff.sort();
 
     println!();
 
