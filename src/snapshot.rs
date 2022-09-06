@@ -46,7 +46,7 @@ impl SnapshotItemMetadata {
             Self::Directory => true,
             Self::File {
                 creation_date: _,
-                comparable,
+                comparable: _,
             } => false,
         }
     }
@@ -56,7 +56,7 @@ impl SnapshotItemMetadata {
             Self::Directory => false,
             Self::File {
                 creation_date: _,
-                comparable,
+                comparable: _,
             } => true,
         }
     }

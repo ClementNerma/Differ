@@ -68,17 +68,17 @@ impl DiffType {
     pub fn get_new_metadata(&self) -> Option<&SnapshotItemMetadata> {
         match self {
             Self::Added { new } => Some(new),
-            Self::Changed { prev, new } => Some(new),
-            Self::TypeChanged { prev, new } => Some(new),
-            Self::Deleted { prev } => None,
+            Self::Changed { prev: _, new } => Some(new),
+            Self::TypeChanged { prev: _, new } => Some(new),
+            Self::Deleted { prev: _ } => None,
         }
     }
 
     pub fn get_prev_metadata(&self) -> Option<&SnapshotItemMetadata> {
         match self {
-            Self::Added { new } => None,
-            Self::Changed { prev, new } => Some(prev),
-            Self::TypeChanged { prev, new } => Some(prev),
+            Self::Added { new: _ } => None,
+            Self::Changed { prev, new: _ } => Some(prev),
+            Self::TypeChanged { prev, new: _ } => Some(prev),
             Self::Deleted { prev } => Some(prev),
         }
     }

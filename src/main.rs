@@ -10,7 +10,7 @@ use std::path::Path;
 
 use crate::{
     diff::{build_diff, DiffType},
-    snapshot::{make_snapshot, SnapshotItemMetadata},
+    snapshot::make_snapshot,
 };
 use clap::StructOpt;
 use cmd::Args;
