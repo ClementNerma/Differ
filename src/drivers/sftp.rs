@@ -48,7 +48,7 @@ impl Driver for SftpDriver {
                     continue;
                 }
 
-                let path = get_relative_utf8_path(root, &item)?.to_string();
+                let path = get_relative_utf8_path(&item, root)?.to_string();
 
                 if stat.is_dir() {
                     metadata = DriverItemMetadata::Directory;
