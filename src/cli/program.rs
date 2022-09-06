@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::path::Path;
 
 use super::cmd::Args;
@@ -14,7 +15,7 @@ use colored::Colorize;
 
 pub fn main() {
     if let Err(err) = inner_main() {
-        eprintln!("{}", err.to_string().bright_red());
+        eprintln!("{}", format!("{:?}", err).bright_red());
         std::process::exit(1);
     }
 }
@@ -87,13 +88,19 @@ fn inner_main() -> Result<()> {
     let source_driver = driver_from_arg(&cmd.source_dir)?;
     let dest_driver = driver_from_arg(&cmd.dest_dir)?;
 
+    let ignore = cmd
+        .ignore
+        .iter()
+        .map(|s| s.as_str())
+        .collect::<HashSet<_>>();
+
     info!("Building snapshots for source and destination...");
 
     // let started = Instant::now();
 
     let (source, dest) = std::thread::scope(|s| -> Result<(Snapshot, Snapshot)> {
-        let source = s.spawn(|| make_snapshot(source_driver.as_ref(), cmd.source_dir));
-        let dest = s.spawn(|| make_snapshot(dest_driver.as_ref(), cmd.dest_dir));
+        let source = s.spawn(|| make_snapshot(source_driver.as_ref(), cmd.source_dir, &ignore));
+        let dest = s.spawn(|| make_snapshot(dest_driver.as_ref(), cmd.dest_dir, &ignore));
 
         Ok((source.join().unwrap()?, dest.join().unwrap()?))
     })?;
