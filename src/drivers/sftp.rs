@@ -38,10 +38,15 @@ impl Driver for SftpDriver {
     fn find_all(&self, root: &str, ignore: &HashSet<&str>) -> Result<Vec<DriverItem>> {
         let root = Path::new(root);
 
-        let read_sub_dir = |dir: &Path| -> Result<Vec<DriverItem>> {
+        fn read_sub_dir(
+            dir: &Path,
+            sftp: &Sftp,
+            ignore: &HashSet<&str>,
+            root: &Path,
+        ) -> Result<Vec<DriverItem>> {
             let mut items = vec![];
 
-            for (item, stat) in self.sftp.readdir(Path::new(dir))? {
+            for (item, stat) in sftp.readdir(Path::new(dir))? {
                 let metadata: DriverItemMetadata;
 
                 if ignore.contains(get_filename(&item)?) {
@@ -75,12 +80,17 @@ impl Driver for SftpDriver {
                 }
 
                 items.push(DriverItem { path, metadata });
+
+                if metadata.is_dir() {
+                    let sub_items = read_sub_dir(&item, sftp, ignore, root)?;
+                    items.extend(sub_items);
+                }
             }
 
             Ok(items)
-        };
+        }
 
-        read_sub_dir(root)
+        read_sub_dir(root, &self.sftp, ignore, root)
     }
 }
 
