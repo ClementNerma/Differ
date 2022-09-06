@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use clap::Parser;
 
 /// Simple program to greet a person
@@ -7,10 +5,10 @@ use clap::Parser;
 #[clap(author, version, about, long_about = None)]
 pub struct Args {
     /// Source directory
-    #[clap(help = "Source directory (files to backup)")]
-    pub source_dir: PathBuf,
+    #[clap(help = "Source directory")]
+    pub source_dir: String,
 
-    /// Backup directory
-    #[clap(help = "Backup directory (where to write the backup files)")]
-    pub backup_dir: PathBuf,
+    /// Destination directory
+    #[clap(help = "Destination directory (to synchronize with the source directory)")]
+    pub dest_dir: String,
 }

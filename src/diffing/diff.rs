@@ -113,9 +113,9 @@ impl DiffType {
     }
 }
 
-pub fn build_diff(source: Snapshot, backup_dir: Snapshot) -> Diff {
+pub fn build_diff(source: Snapshot, dest_dir: Snapshot) -> Diff {
     let source_items = build_item_names_hashmap(&source);
-    let backed_up_items = build_item_names_hashmap(&backup_dir);
+    let backed_up_items = build_item_names_hashmap(&dest_dir);
 
     let source_items_paths: HashSet<_> = source_items.keys().collect();
     let backed_up_items_paths: HashSet<_> = backed_up_items.keys().collect();
@@ -150,7 +150,7 @@ pub fn build_diff(source: Snapshot, backup_dir: Snapshot) -> Diff {
             .iter()
             .filter(|item| backed_up_items_paths.contains(&&item.path))
             .filter_map(|source_item| {
-                let backed_up_item = backup_dir
+                let backed_up_item = dest_dir
                     .items
                     .iter()
                     .find(|c| c.path == source_item.path)

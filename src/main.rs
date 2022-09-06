@@ -12,9 +12,11 @@ use crate::{
     diffing::{build_diff, CategorizedDiff},
     drivers::{fs::FsDriver, make_snapshot, DriverItemMetadata},
 };
+use anyhow::{bail, Context, Result};
 use clap::StructOpt;
 use cmd::Args;
 use colored::Colorize;
+use drivers::{sftp::SftpDriver, Driver};
 
 fn human_size(bytes: u64) -> String {
     if bytes < 1024 {
@@ -36,44 +38,49 @@ fn human_size(bytes: u64) -> String {
     format!("{:.2} GiB", bytes / 1024.0)
 }
 
+fn driver_from_arg(arg: &str) -> Result<Box<dyn Driver + Send + Sync>> {
+    if let Some(arg) = arg.strip_prefix("sftp:") {
+        let mut split = arg.split('@');
+
+        let username = split
+            .next()
+            .context("Please provide a username for SFTP driver (<username>@<address>)")?;
+        let address = split
+            .next()
+            .context("Please provide an address for SFTP driver (<username>@<address>)")?;
+
+        if split.next().is_some() {
+            bail!("Only one '@' is allowed in argument for SFTP driver");
+        }
+
+        return Ok(Box::new(SftpDriver::connect(address, username)?));
+    }
+
+    Ok(Box::new(FsDriver::new()))
+}
+
 fn main() {
     let cmd = Args::parse();
 
-    let driver = FsDriver::new();
+    let source_driver = driver_from_arg(&cmd.source_dir).unwrap();
+    let dest_driver = driver_from_arg(&cmd.dest_dir).unwrap();
 
     info!("Building snapshots for source and destination...");
 
     // let started = Instant::now();
 
-    let (source, backup) = std::thread::scope(|s| {
-        let source = s.spawn(|| {
-            make_snapshot(
-                &driver,
-                cmd.source_dir
-                    .to_str()
-                    .expect("Source path contains non-UTF-8 characters"),
-            )
-            .unwrap()
-        });
+    let (source, dest) = std::thread::scope(|s| {
+        let source = s.spawn(|| make_snapshot(source_driver.as_ref(), &cmd.source_dir).unwrap());
+        let dest = s.spawn(|| make_snapshot(dest_driver.as_ref(), &cmd.dest_dir).unwrap());
 
-        let backup = s.spawn(|| {
-            make_snapshot(
-                &driver,
-                cmd.backup_dir
-                    .to_str()
-                    .expect("Backup path contains non-UTF-8 characters"),
-            )
-            .unwrap()
-        });
-
-        (source.join().unwrap(), backup.join().unwrap())
+        (source.join().unwrap(), dest.join().unwrap())
     });
 
     // println!("Snapshots built in {}s.", started.elapsed().as_secs());
 
     // let started = Instant::now();
 
-    let mut diff = build_diff(source, backup);
+    let mut diff = build_diff(source, dest);
     diff.sort();
 
     let cat = CategorizedDiff::new(diff);
