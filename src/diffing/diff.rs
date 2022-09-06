@@ -1,4 +1,5 @@
-use super::{Snapshot, SnapshotComparableFileMetadata, SnapshotItemMetadata};
+use crate::drivers::{DriverFileMetadata, DriverItemMetadata, Snapshot};
+
 use std::{
     cmp::Ordering,
     collections::{HashMap, HashSet},
@@ -60,53 +61,53 @@ pub enum DiffType {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct DiffItemAdded {
-    pub new: SnapshotItemMetadata,
+    pub new: DriverItemMetadata,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct DiffItemModified {
-    pub prev: SnapshotComparableFileMetadata,
-    pub new: SnapshotComparableFileMetadata,
+    pub prev: DriverFileMetadata,
+    pub new: DriverFileMetadata,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct DiffItemTypeChanged {
-    pub prev: SnapshotItemMetadata,
-    pub new: SnapshotItemMetadata,
+    pub prev: DriverItemMetadata,
+    pub new: DriverItemMetadata,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct DiffItemDeleted {
-    pub prev: SnapshotItemMetadata,
+    pub prev: DriverItemMetadata,
 }
 
 impl DiffType {
-    pub fn get_new_metadata(self) -> Option<SnapshotItemMetadata> {
+    pub fn get_new_metadata(self) -> Option<DriverItemMetadata> {
         match self {
             Self::Added(DiffItemAdded { new }) => Some(new),
             Self::Modified(DiffItemModified { prev: _, new }) => {
-                Some(SnapshotItemMetadata::File(new))
+                Some(DriverItemMetadata::File(new))
             }
             Self::TypeChanged(DiffItemTypeChanged { prev: _, new }) => Some(new),
             Self::Deleted(DiffItemDeleted { prev: _ }) => None,
         }
     }
 
-    pub fn get_prev_metadata(self) -> Option<SnapshotItemMetadata> {
+    pub fn get_prev_metadata(self) -> Option<DriverItemMetadata> {
         match self {
             Self::Added(DiffItemAdded { new: _ }) => None,
             Self::Modified(DiffItemModified { prev, new: _ }) => {
-                Some(SnapshotItemMetadata::File(prev))
+                Some(DriverItemMetadata::File(prev))
             }
             Self::TypeChanged(DiffItemTypeChanged { prev, new: _ }) => Some(prev),
             Self::Deleted(DiffItemDeleted { prev }) => Some(prev),
         }
     }
 
-    pub fn get_relevant_metadata(self) -> SnapshotItemMetadata {
+    pub fn get_relevant_metadata(self) -> DriverItemMetadata {
         match self {
             Self::Added(DiffItemAdded { new }) => new,
-            Self::Modified(DiffItemModified { prev: _, new }) => SnapshotItemMetadata::File(new),
+            Self::Modified(DiffItemModified { prev: _, new }) => DriverItemMetadata::File(new),
             Self::TypeChanged(DiffItemTypeChanged { prev: _, new }) => new,
             Self::Deleted(DiffItemDeleted { prev }) => prev,
         }
@@ -158,10 +159,10 @@ pub fn build_diff(source: Snapshot, backup_dir: Snapshot) -> Diff {
 
                 match (source_item.metadata, backed_up_item.metadata) {
                     // Both directories = no change
-                    (SnapshotItemMetadata::Directory, SnapshotItemMetadata::Directory) => None,
+                    (DriverItemMetadata::Directory, DriverItemMetadata::Directory) => None,
                     // Source item is directory and backed up item is file or the opposite = type changed
-                    (SnapshotItemMetadata::Directory, SnapshotItemMetadata::File { .. })
-                    | (SnapshotItemMetadata::File { .. }, SnapshotItemMetadata::Directory) => {
+                    (DriverItemMetadata::Directory, DriverItemMetadata::File { .. })
+                    | (DriverItemMetadata::File { .. }, DriverItemMetadata::Directory) => {
                         Some(DiffItem {
                             path: PathBuf::from(&source_item.path),
                             status: DiffType::TypeChanged(DiffItemTypeChanged {
@@ -172,8 +173,8 @@ pub fn build_diff(source: Snapshot, backup_dir: Snapshot) -> Diff {
                     }
                     // Otherwise, compare their metadata to see if something changed
                     (
-                        SnapshotItemMetadata::File(source_data),
-                        SnapshotItemMetadata::File(backed_up_data),
+                        DriverItemMetadata::File(source_data),
+                        DriverItemMetadata::File(backed_up_data),
                     ) => {
                         if source_data == backed_up_data {
                             None
@@ -194,7 +195,7 @@ pub fn build_diff(source: Snapshot, backup_dir: Snapshot) -> Diff {
     Diff::new(diff)
 }
 
-fn build_item_names_hashmap(snapshot: &Snapshot) -> HashMap<&String, &SnapshotItemMetadata> {
+fn build_item_names_hashmap(snapshot: &Snapshot) -> HashMap<&String, &DriverItemMetadata> {
     snapshot
         .items
         .iter()

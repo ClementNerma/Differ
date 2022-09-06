@@ -3,13 +3,16 @@
 
 mod cmd;
 pub mod diffing;
+pub mod drivers;
 mod logging;
 
-use crate::diffing::{build_diff, make_snapshot, CategorizedDiff, SnapshotItemMetadata};
+use crate::{
+    diffing::{build_diff, CategorizedDiff},
+    drivers::{fs::FsDriver, make_snapshot, DriverItemMetadata},
+};
 use clap::StructOpt;
 use cmd::Args;
 use colored::Colorize;
-use std::path::Path;
 
 fn human_size(bytes: u64) -> String {
     if bytes < 1024 {
@@ -34,11 +37,25 @@ fn human_size(bytes: u64) -> String {
 fn main() {
     let cmd = Args::parse();
 
+    let driver = FsDriver::new();
+
     info!("Building source directory snapshot...");
-    let source = make_snapshot(&cmd.source_dir).unwrap();
+    let source = make_snapshot(
+        &driver,
+        cmd.source_dir
+            .to_str()
+            .expect("Source path contains non-UTF-8 characters"),
+    )
+    .unwrap();
 
     info!("Building backup directory snapshot...");
-    let backup = make_snapshot(Path::new(&cmd.backup_dir)).unwrap();
+    let backup = make_snapshot(
+        &driver,
+        cmd.backup_dir
+            .to_str()
+            .expect("Backup path contains non-UTF-8 characters"),
+    )
+    .unwrap();
 
     info!("Diffing...");
     let mut diff = build_diff(source, backup);
@@ -51,10 +68,10 @@ fn main() {
 
         for (path, added) in &cat.added {
             match added.new {
-                SnapshotItemMetadata::Directory => {
+                DriverItemMetadata::Directory => {
                     println!(" {}", format!("{}/", path.to_string_lossy()).bright_green())
                 }
-                SnapshotItemMetadata::File(m) => println!(
+                DriverItemMetadata::File(m) => println!(
                     " {} {}",
                     path.to_string_lossy().bright_green(),
                     format!("({})", human_size(m.size)).bright_yellow()
@@ -82,9 +99,9 @@ fn main() {
     if !cat.type_changed.is_empty() {
         println!("Type changed:");
 
-        let type_letter = |m: SnapshotItemMetadata| match m {
-            SnapshotItemMetadata::Directory => "D",
-            SnapshotItemMetadata::File(_) => "F",
+        let type_letter = |m: DriverItemMetadata| match m {
+            DriverItemMetadata::Directory => "D",
+            DriverItemMetadata::File(_) => "F",
         };
 
         for (path, type_changed) in &cat.type_changed {
@@ -107,10 +124,10 @@ fn main() {
 
         for (path, deleted) in &cat.deleted {
             match deleted.prev {
-                SnapshotItemMetadata::Directory => {
+                DriverItemMetadata::Directory => {
                     println!(" {}", format!("{}/", path.to_string_lossy()).bright_red())
                 }
-                SnapshotItemMetadata::File(m) => println!(
+                DriverItemMetadata::File(m) => println!(
                     " {} {}",
                     path.to_string_lossy().bright_red(),
                     format!("({})", human_size(m.size)).bright_yellow()
