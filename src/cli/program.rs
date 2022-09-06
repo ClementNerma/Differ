@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use super::cmd::Args;
+use crate::drivers::Snapshot;
 use crate::drivers::{sftp::SftpDriver, Driver};
 use crate::info;
 use crate::{
@@ -83,19 +84,19 @@ fn driver_from_arg(arg: &str) -> Result<Box<dyn Driver + Send + Sync>> {
 fn inner_main() -> Result<()> {
     let cmd = Args::parse();
 
-    let source_driver = driver_from_arg(&cmd.source_dir).unwrap();
-    let dest_driver = driver_from_arg(&cmd.dest_dir).unwrap();
+    let source_driver = driver_from_arg(&cmd.source_dir)?;
+    let dest_driver = driver_from_arg(&cmd.dest_dir)?;
 
     info!("Building snapshots for source and destination...");
 
     // let started = Instant::now();
 
-    let (source, dest) = std::thread::scope(|s| {
-        let source = s.spawn(|| make_snapshot(source_driver.as_ref(), cmd.source_dir).unwrap());
-        let dest = s.spawn(|| make_snapshot(dest_driver.as_ref(), cmd.dest_dir).unwrap());
+    let (source, dest) = std::thread::scope(|s| -> Result<(Snapshot, Snapshot)> {
+        let source = s.spawn(|| make_snapshot(source_driver.as_ref(), cmd.source_dir));
+        let dest = s.spawn(|| make_snapshot(dest_driver.as_ref(), cmd.dest_dir));
 
-        (source.join().unwrap(), dest.join().unwrap())
-    });
+        Ok((source.join().unwrap()?, dest.join().unwrap()?))
+    })?;
 
     // println!("Snapshots built in {}s.", started.elapsed().as_secs());
 
