@@ -74,22 +74,21 @@ impl Driver for FsDriver {
 
                 let item = item.context("Failed to access item")?;
                 let item = item.path();
+                let metadata = item.metadata().with_context(|| {
+                    format!("Failed to get file's metadata for: {}", item.display())
+                })?;
 
                 let path = get_relative_utf8_path(item, root)?.to_string();
 
-                if item.is_symlink() {
+                if metadata.is_symlink() {
                     // TODO: symbolic links
                     bail!("Warning: ignored symbolic link: {}", item.display())
-                } else if item.is_dir() {
+                } else if metadata.is_dir() {
                     Ok(Some(DriverItem {
                         path,
                         metadata: DriverItemMetadata::Directory,
                     }))
-                } else if item.is_file() {
-                    let metadata = item.metadata().with_context(|| {
-                        format!("Failed to get file's metadata for: {}", item.display())
-                    })?;
-
+                } else if metadata.is_file() {
                     // TODO: get real size
                     Ok(Some(DriverItem {
                         path,
