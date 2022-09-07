@@ -167,7 +167,7 @@ fn inner_main() -> Result<()> {
     let cat = CategorizedDiff::new(diff);
 
     if !cat.added.is_empty() {
-        println!("Added:");
+        info!("Added:");
 
         for (path, added) in &cat.added {
             match added.new {
@@ -186,7 +186,7 @@ fn inner_main() -> Result<()> {
     }
 
     if !cat.modified.is_empty() {
-        println!("Modified:");
+        info!("Modified:");
 
         for (path, modified) in &cat.modified {
             println!(
@@ -199,7 +199,7 @@ fn inner_main() -> Result<()> {
     }
 
     if !cat.type_changed.is_empty() {
-        println!("Type changed:");
+        info!("Type changed:");
 
         let type_letter = |m: DriverItemMetadata| match m {
             DriverItemMetadata::Directory => "D",
@@ -222,7 +222,7 @@ fn inner_main() -> Result<()> {
     }
 
     if !cat.deleted.is_empty() {
-        println!("Deleted:");
+        info!("Deleted:");
 
         for (path, deleted) in &cat.deleted {
             match deleted.prev {
@@ -254,7 +254,7 @@ fn inner_main() -> Result<()> {
             .iter()
             .fold(0, |acc, (_, i)| acc + i.new.size().unwrap_or(0));
 
-    println!(
+    info!(
         "Found a total of {} items to transfer and {} to delete for a total of {}.",
         transfer_count.to_string().bright_green(),
         delete_count.to_string().bright_red(),
