@@ -1,15 +1,16 @@
 use std::collections::HashSet;
 use std::path::Path;
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 
 use super::cmd::Args;
-use crate::drivers::Snapshot;
 use crate::drivers::{sftp::SftpDriver, Driver};
 use crate::info;
 use crate::{
     diffing::{build_diff, CategorizedDiff},
     drivers::{fs::FsDriver, make_snapshot, DriverItemMetadata},
 };
-use anyhow::{bail, Context, Result};
+use anyhow::{anyhow, bail, Context, Error, Result};
 use clap::StructOpt;
 use colored::Colorize;
 
@@ -106,11 +107,54 @@ fn inner_main() -> Result<()> {
 
     // let started = Instant::now();
 
-    let (source, dest) = std::thread::scope(|s| -> Result<(Snapshot, Snapshot)> {
-        let source = s.spawn(|| make_snapshot(source_driver.as_ref(), source_dir, &ignore));
-        let dest = s.spawn(|| make_snapshot(dest_driver.as_ref(), dest_dir, &ignore));
+    let stop_request = Arc::new(AtomicBool::new(false));
 
-        Ok((source.join().unwrap()?, dest.join().unwrap()?))
+    let (source, dest) = std::thread::scope(|s| {
+        let source = s.spawn(|| {
+            make_snapshot(
+                source_driver.as_ref(),
+                source_dir,
+                &ignore,
+                Arc::clone(&stop_request),
+            )
+        });
+
+        let dest = s.spawn(|| {
+            make_snapshot(
+                dest_driver.as_ref(),
+                dest_dir,
+                &ignore,
+                Arc::clone(&stop_request),
+            )
+        });
+
+        let err = |err: Error| -> String {
+            format!("{:?}", err)
+                .split('\n')
+                .map(|line| format!("    {}", line))
+                .collect::<Vec<_>>()
+                .join("\n")
+        };
+
+        match (source.join().unwrap(), dest.join().unwrap()) {
+            (Err(source), Err(dest)) => Err(anyhow!(
+                "Source snapshot failed:\n{}\n\nDestination snapshot failed:\n{}",
+                err(source).bright_yellow(),
+                err(dest).bright_yellow()
+            )),
+
+            (Err(source), Ok(_)) => Err(anyhow!(
+                "Source snapshot failed:\n{}",
+                err(source).bright_yellow()
+            )),
+
+            (Ok(_), Err(dest)) => Err(anyhow!(
+                "Destination snapshot failed:\n{}",
+                err(dest).bright_yellow()
+            )),
+
+            (Ok(source), Ok(dest)) => Ok((source, dest)),
+        }
     })?;
 
     // println!("Snapshots built in {}s.", started.elapsed().as_secs());

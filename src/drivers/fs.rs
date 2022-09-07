@@ -1,6 +1,14 @@
 use anyhow::Result;
 use std::{
-    collections::HashSet, ffi::OsStr, fs::canonicalize, os::unix::prelude::MetadataExt, path::Path,
+    collections::HashSet,
+    ffi::OsStr,
+    fs::canonicalize,
+    os::unix::prelude::MetadataExt,
+    path::Path,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
 };
 
 use anyhow::{bail, Context};
@@ -24,7 +32,12 @@ impl Default for FsDriver {
 }
 
 impl Driver for FsDriver {
-    fn find_all(&self, root: &str, ignore: &HashSet<&str>) -> Result<Vec<DriverItem>> {
+    fn find_all(
+        &self,
+        root: &str,
+        ignore: &HashSet<&str>,
+        stop_request: Arc<AtomicBool>,
+    ) -> Result<Vec<DriverItem>> {
         let ignore: HashSet<_> = ignore.iter().map(OsStr::new).collect();
 
         let root = canonicalize(root)
@@ -55,6 +68,10 @@ impl Driver for FsDriver {
             })
             .par_bridge()
             .map(|item| {
+                if stop_request.load(Ordering::Relaxed) {
+                    bail!("Process was requested to stop.");
+                }
+
                 let item = item.context("Failed to access item")?;
                 let item = item.path();
 

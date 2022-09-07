@@ -1,4 +1,10 @@
-use std::collections::HashSet;
+use std::{
+    collections::HashSet,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+};
 
 use anyhow::{bail, Result};
 
@@ -14,8 +20,18 @@ pub fn make_snapshot(
     driver: &dyn Driver,
     path: String,
     ignore: &HashSet<&str>,
+    stop_request: Arc<AtomicBool>,
 ) -> Result<Snapshot> {
-    let items = driver.find_all(&path, ignore)?;
+    let items = driver.find_all(&path, ignore, Arc::clone(&stop_request));
+
+    // TODO: When https://github.com/rust-lang/rust/issues/91345 is resolved, use `inspect_err` instead of a match
+    let items = match items {
+        Ok(items) => items,
+        Err(e) => {
+            stop_request.store(true, Ordering::Relaxed);
+            return Err(e);
+        }
+    };
 
     let mut uniq = HashSet::new();
 
@@ -29,7 +45,12 @@ pub fn make_snapshot(
 }
 
 pub trait Driver {
-    fn find_all(&self, dir: &str, ignore: &HashSet<&str>) -> Result<Vec<DriverItem>>;
+    fn find_all(
+        &self,
+        dir: &str,
+        ignore: &HashSet<&str>,
+        stop_request: Arc<AtomicBool>,
+    ) -> Result<Vec<DriverItem>>;
 }
 
 #[derive(Debug)]

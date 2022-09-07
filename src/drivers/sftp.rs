@@ -1,4 +1,13 @@
-use std::{collections::HashSet, convert::TryInto, net::TcpStream, path::Path};
+use std::{
+    collections::HashSet,
+    convert::TryInto,
+    net::TcpStream,
+    path::Path,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+};
 
 use anyhow::{bail, Context, Result};
 use ssh2::{Session, Sftp};
@@ -35,7 +44,12 @@ impl SftpDriver {
 }
 
 impl Driver for SftpDriver {
-    fn find_all(&self, root: &str, ignore: &HashSet<&str>) -> Result<Vec<DriverItem>> {
+    fn find_all(
+        &self,
+        root: &str,
+        ignore: &HashSet<&str>,
+        stop_request: Arc<AtomicBool>,
+    ) -> Result<Vec<DriverItem>> {
         let root = Path::new(root);
 
         fn read_sub_dir(
@@ -43,10 +57,15 @@ impl Driver for SftpDriver {
             sftp: &Sftp,
             ignore: &HashSet<&str>,
             root: &Path,
+            stop_request: Arc<AtomicBool>,
         ) -> Result<Vec<DriverItem>> {
             let mut items = vec![];
 
             for (item, stat) in sftp.readdir(Path::new(dir))? {
+                if stop_request.load(Ordering::Relaxed) {
+                    bail!("Process was requested to stop.");
+                }
+
                 let metadata: DriverItemMetadata;
 
                 if ignore.contains(get_filename(&item)?) {
@@ -82,7 +101,8 @@ impl Driver for SftpDriver {
                 items.push(DriverItem { path, metadata });
 
                 if metadata.is_dir() {
-                    let sub_items = read_sub_dir(&item, sftp, ignore, root)?;
+                    let sub_items =
+                        read_sub_dir(&item, sftp, ignore, root, Arc::clone(&stop_request))?;
                     items.extend(sub_items);
                 }
             }
@@ -90,7 +110,7 @@ impl Driver for SftpDriver {
             Ok(items)
         }
 
-        read_sub_dir(root, &self.sftp, ignore, root)
+        read_sub_dir(root, &self.sftp, ignore, root, stop_request)
     }
 }
 
