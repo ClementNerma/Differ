@@ -8,11 +8,11 @@ use std::time::Instant;
 use super::cmd::Args;
 use crate::drivers::OnItemHandler;
 use crate::drivers::{sftp::SftpDriver, Driver};
-use crate::info;
 use crate::{
     diffing::{build_diff, CategorizedDiff},
     drivers::{fs::FsDriver, make_snapshot, DriverItemMetadata},
 };
+use crate::{info, success};
 use anyhow::{anyhow, bail, Context, Error, Result};
 use clap::StructOpt;
 use colored::Colorize;
@@ -182,6 +182,12 @@ fn inner_main() -> Result<()> {
     let started = Instant::now();
 
     let mut diff = build_diff(source, dest);
+
+    if diff.is_empty() {
+        success!("Source and destination are completely identical, nothing to do!");
+        return Ok(());
+    }
+
     diff.sort();
 
     let cat = CategorizedDiff::new(diff);

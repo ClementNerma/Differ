@@ -15,6 +15,10 @@ impl Diff {
         Self(items)
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
     pub fn into_items(self) -> Vec<DiffItem> {
         self.0
     }
