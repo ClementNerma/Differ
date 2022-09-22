@@ -3,7 +3,7 @@ use std::io::{stdout, Write};
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
-use std::time::SystemTime;
+use std::time::Instant;
 
 use super::cmd::Args;
 use crate::drivers::OnItemHandler;
@@ -108,7 +108,7 @@ fn inner_main() -> Result<()> {
 
     info!("Building snapshots for source and destination...");
 
-    // let started = Instant::now();
+    let started = Instant::now();
 
     let stop_request = Arc::new(AtomicBool::new(false));
 
@@ -143,7 +143,15 @@ fn inner_main() -> Result<()> {
                 .join("\n")
         };
 
-        match (source.join().unwrap(), dest.join().unwrap()) {
+        let (source, dest) = (source.join().unwrap(), dest.join().unwrap());
+
+        if source.is_ok() && dest.is_ok() {
+            print!("\r");
+        } else {
+            println!();
+        }
+
+        match (source, dest) {
             (Err(source), Err(dest)) => Err(anyhow!(
                 "Source snapshot failed:\n{}\n\nDestination snapshot failed:\n{}",
                 err(source).bright_yellow(),
@@ -164,9 +172,14 @@ fn inner_main() -> Result<()> {
         }
     })?;
 
-    // println!("Snapshots built in {}s.", started.elapsed().as_secs());
+    info!(
+        "Found {} files in source and {} in destination in {}. Computing differences...",
+        source.items.len().to_string().bright_yellow(),
+        dest.items.len().to_string().bright_yellow(),
+        format!("{}s", started.elapsed().as_secs()).bright_magenta()
+    );
 
-    // let started = Instant::now();
+    let started = Instant::now();
 
     let mut diff = build_diff(source, dest);
     diff.sort();
@@ -234,9 +247,9 @@ fn inner_main() -> Result<()> {
         for (path, deleted) in &cat.deleted {
             match deleted.prev {
                 DriverItemMetadata::Directory => {
-                    println!(" {}", format!("{path}/").bright_red())
+                    info!(" {}", format!("{path}/").bright_red())
                 }
-                DriverItemMetadata::File(m) => println!(
+                DriverItemMetadata::File(m) => info!(
                     " {} {}",
                     path.bright_red(),
                     format!("({})", human_size(m.size)).bright_yellow()
@@ -244,10 +257,13 @@ fn inner_main() -> Result<()> {
             }
         }
 
-        println!();
+        info!("");
     }
 
-    // println!("Diffing made in {}s.", started.elapsed().as_secs());
+    info!(
+        "Differences computed in {}.",
+        format!("{}s", started.elapsed().as_secs()).bright_magenta()
+    );
 
     let transfer_count = cat.added.len() + cat.modified.len() + cat.type_changed.len();
     let delete_count = cat.type_changed.len() + cat.deleted.len();
@@ -272,7 +288,7 @@ fn inner_main() -> Result<()> {
 }
 
 pub fn items_spinner() -> (OnItemHandler, OnItemHandler) {
-    let started = SystemTime::now();
+    let started = Instant::now();
 
     let started_1 = Arc::new(started);
     let started_2 = Arc::clone(&started_1);
@@ -283,10 +299,10 @@ pub fn items_spinner() -> (OnItemHandler, OnItemHandler) {
     let dest_counter_1 = Arc::new(AtomicU64::new(0));
     let dest_counter_2 = Arc::clone(&dest_counter_1);
 
-    fn update(src: u64, dest: u64, started: SystemTime) {
+    fn update(src: u64, dest: u64, started: Instant) {
         print!(
             "\rSource: found {src} items | Destination: found {dest} items | Searching for {}s...",
-            started.elapsed().unwrap().as_secs()
+            started.elapsed().as_secs()
         );
 
         stdout().flush().unwrap();

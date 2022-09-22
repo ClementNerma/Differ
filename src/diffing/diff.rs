@@ -1,4 +1,7 @@
-use crate::drivers::{DriverFileMetadata, DriverItemMetadata, Snapshot};
+use crate::{
+    drivers::{DriverFileMetadata, DriverItemMetadata, Snapshot},
+    info,
+};
 
 use std::{
     cmp::Ordering,
@@ -81,6 +84,8 @@ pub fn build_diff(source: Snapshot, dest_dir: Snapshot) -> Diff {
 
     let mut diff = Vec::with_capacity(source_items.len());
 
+    info!("> Building list of new items...");
+
     diff.extend(
         source_items_paths
             .difference(&backed_up_items_paths)
@@ -92,6 +97,8 @@ pub fn build_diff(source: Snapshot, dest_dir: Snapshot) -> Diff {
             }),
     );
 
+    info!("> Building list of deleted items...");
+
     diff.extend(
         backed_up_items_paths
             .difference(&source_items_paths)
@@ -102,6 +109,8 @@ pub fn build_diff(source: Snapshot, dest_dir: Snapshot) -> Diff {
                 }),
             }),
     );
+
+    info!("> Building list of modified items...");
 
     diff.extend(
         source
