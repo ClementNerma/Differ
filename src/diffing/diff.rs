@@ -1,5 +1,5 @@
 use crate::{
-    drivers::{DriverFileMetadata, DriverItemMetadata, Snapshot},
+    drivers::{DriverFileMetadata, DriverItem, DriverItemMetadata, Snapshot},
     info,
 };
 
@@ -92,7 +92,7 @@ pub fn build_diff(source: Snapshot, dest_dir: Snapshot) -> Diff {
             .map(|item| DiffItem {
                 path: String::clone(item),
                 status: DiffType::Added(DiffItemAdded {
-                    new: **source_items.get(*item).unwrap(),
+                    new: source_items.get(*item).unwrap().metadata,
                 }),
             }),
     );
@@ -105,7 +105,7 @@ pub fn build_diff(source: Snapshot, dest_dir: Snapshot) -> Diff {
             .map(|item| DiffItem {
                 path: String::clone(item),
                 status: DiffType::Deleted(DiffItemDeleted {
-                    prev: **backed_up_items.get(*item).unwrap(),
+                    prev: backed_up_items.get(*item).unwrap().metadata,
                 }),
             }),
     );
@@ -118,11 +118,7 @@ pub fn build_diff(source: Snapshot, dest_dir: Snapshot) -> Diff {
             .iter()
             .filter(|item| backed_up_items_paths.contains(&&item.path))
             .filter_map(|source_item| {
-                let backed_up_item = dest_dir
-                    .items
-                    .iter()
-                    .find(|c| c.path == source_item.path)
-                    .unwrap();
+                let backed_up_item = backed_up_items.get(&source_item.path).unwrap();
 
                 match (source_item.metadata, backed_up_item.metadata) {
                     // Both directories = no change
@@ -162,10 +158,10 @@ pub fn build_diff(source: Snapshot, dest_dir: Snapshot) -> Diff {
     Diff::new(diff)
 }
 
-fn build_item_names_hashmap(snapshot: &Snapshot) -> HashMap<&String, &DriverItemMetadata> {
+fn build_item_names_hashmap(snapshot: &Snapshot) -> HashMap<&String, &DriverItem> {
     snapshot
         .items
         .iter()
-        .map(|item| (&item.path, &item.metadata))
+        .map(|item| (&item.path, item))
         .collect::<HashMap<_, _>>()
 }
