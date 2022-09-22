@@ -56,7 +56,6 @@ pub trait Driver {
 }
 
 pub type OnItemHandler = Box<dyn Fn(&DriverItem) + Send + Sync + 'static>;
-pub type OnItemHandlerRef<'a> = &'a (dyn Fn(&DriverItem) + Send + Sync + 'static);
 
 #[derive(Debug)]
 pub struct DriverItem {
