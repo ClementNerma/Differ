@@ -15,7 +15,7 @@ use anyhow::{bail, Context};
 use rayon::prelude::{ParallelBridge, ParallelIterator};
 use walkdir::WalkDir;
 
-use super::{Driver, DriverFileMetadata, DriverItem, DriverItemMetadata};
+use super::{Driver, DriverFileMetadata, DriverItem, DriverItemMetadata, OnItemHandler};
 
 pub struct FsDriver;
 
@@ -37,6 +37,7 @@ impl Driver for FsDriver {
         root: &str,
         ignore: &HashSet<&str>,
         stop_request: Arc<AtomicBool>,
+        on_item: Option<OnItemHandler>,
     ) -> Result<Vec<DriverItem>> {
         let ignore: HashSet<_> = ignore.iter().map(OsStr::new).collect();
 
@@ -80,27 +81,33 @@ impl Driver for FsDriver {
 
                 let path = get_relative_utf8_path(item, root)?.to_string();
 
-                if metadata.is_symlink() {
+                let item = if metadata.is_symlink() {
                     // TODO: symbolic links
                     bail!("Warning: ignored symbolic link: {}", item.display())
                 } else if metadata.is_dir() {
-                    Ok(Some(DriverItem {
+                    DriverItem {
                         path,
                         metadata: DriverItemMetadata::Directory,
-                    }))
+                    }
                 } else if metadata.is_file() {
                     // TODO: get real size
-                    Ok(Some(DriverItem {
+                    DriverItem {
                         path,
                         metadata: DriverItemMetadata::File(DriverFileMetadata {
                             // creation_date: metadata.ctime(),
                             modification_date: metadata.mtime(),
                             size: metadata.len(),
                         }),
-                    }))
+                    }
                 } else {
                     bail!("Encountered unknown item type at: {}", item.display())
+                };
+
+                if let Some(handler) = &on_item {
+                    handler(&item);
                 }
+
+                Ok(Some(item))
             })
             .filter_map(|r| r.transpose())
             .collect::<Result<Vec<_>, _>>()

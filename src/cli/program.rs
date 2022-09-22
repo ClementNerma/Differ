@@ -1,9 +1,12 @@
 use std::collections::HashSet;
+use std::io::{stdout, Write};
 use std::path::Path;
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
+use std::time::SystemTime;
 
 use super::cmd::Args;
+use crate::drivers::OnItemHandler;
 use crate::drivers::{sftp::SftpDriver, Driver};
 use crate::info;
 use crate::{
@@ -110,12 +113,15 @@ fn inner_main() -> Result<()> {
     let stop_request = Arc::new(AtomicBool::new(false));
 
     let (source, dest) = std::thread::scope(|s| {
+        let (source_update, dest_update) = items_spinner();
+
         let source = s.spawn(|| {
             make_snapshot(
                 source_driver.as_ref(),
                 source_dir,
                 &ignore,
                 Arc::clone(&stop_request),
+                Some(source_update),
             )
         });
 
@@ -125,6 +131,7 @@ fn inner_main() -> Result<()> {
                 dest_dir,
                 &ignore,
                 Arc::clone(&stop_request),
+                Some(dest_update),
             )
         });
 
@@ -262,4 +269,47 @@ fn inner_main() -> Result<()> {
     );
 
     Ok(())
+}
+
+pub fn items_spinner() -> (OnItemHandler, OnItemHandler) {
+    let started = SystemTime::now();
+
+    let started_1 = Arc::new(started);
+    let started_2 = Arc::clone(&started_1);
+
+    let src_counter_1 = Arc::new(AtomicU64::new(0));
+    let src_counter_2 = Arc::clone(&src_counter_1);
+
+    let dest_counter_1 = Arc::new(AtomicU64::new(0));
+    let dest_counter_2 = Arc::clone(&dest_counter_1);
+
+    fn update(src: u64, dest: u64, started: SystemTime) {
+        print!(
+            "\rSource: found {src} items | Destination: found {dest} items | Searching for {}s...",
+            started.elapsed().unwrap().as_secs()
+        );
+
+        stdout().flush().unwrap();
+    }
+
+    update(0, 0, started);
+
+    (
+        Box::new(move |_| {
+            let updated = src_counter_1.load(Ordering::Acquire) + 1;
+            src_counter_1.store(updated, Ordering::Release);
+
+            if updated % 100 == 0 {
+                update(updated, dest_counter_1.load(Ordering::Acquire), *started_1);
+            }
+        }),
+        Box::new(move |_| {
+            let updated = dest_counter_2.load(Ordering::Acquire) + 1;
+            dest_counter_2.store(updated, Ordering::Release);
+
+            if updated % 100 == 0 {
+                update(src_counter_2.load(Ordering::Acquire), updated, *started_2);
+            }
+        }),
+    )
 }

@@ -12,7 +12,9 @@ use std::{
 use anyhow::{bail, Context, Result};
 use ssh2::{Session, Sftp};
 
-use super::{Driver, DriverFileMetadata, DriverItem, DriverItemMetadata};
+use crate::drivers::OnItemHandlerRef;
+
+use super::{Driver, DriverFileMetadata, DriverItem, DriverItemMetadata, OnItemHandler};
 
 pub struct SftpDriver {
     sftp: Sftp,
@@ -49,6 +51,7 @@ impl Driver for SftpDriver {
         root: &str,
         ignore: &HashSet<&str>,
         stop_request: Arc<AtomicBool>,
+        on_item: Option<OnItemHandler>,
     ) -> Result<Vec<DriverItem>> {
         let root = Path::new(root);
 
@@ -58,21 +61,22 @@ impl Driver for SftpDriver {
             ignore: &HashSet<&str>,
             root: &Path,
             stop_request: Arc<AtomicBool>,
+            on_item: Option<OnItemHandlerRef>,
         ) -> Result<Vec<DriverItem>> {
             let mut items = vec![];
 
-            for (item, stat) in sftp.readdir(Path::new(dir))? {
+            for (item_path, stat) in sftp.readdir(Path::new(dir))? {
                 if stop_request.load(Ordering::Relaxed) {
                     bail!("Process was requested to stop.");
                 }
 
                 let metadata: DriverItemMetadata;
 
-                if ignore.contains(get_filename(&item)?) {
+                if ignore.contains(get_filename(&item_path)?) {
                     continue;
                 }
 
-                let path = get_relative_utf8_path(&item, root)?.to_string();
+                let path = get_relative_utf8_path(&item_path, root)?.to_string();
 
                 if stat.is_dir() {
                     metadata = DriverItemMetadata::Directory;
@@ -81,28 +85,43 @@ impl Driver for SftpDriver {
                         modification_date: stat
                             .mtime
                             .with_context(|| {
-                                format!("Missing modification time on item: {}", item.display())
+                                format!(
+                                    "Missing modification time on item: {}",
+                                    item_path.display()
+                                )
                             })?
                             .try_into()
                             .with_context(|| {
                                 format!(
                                     "Invalid modification time found for item: {}",
-                                    item.display()
+                                    item_path.display()
                                 )
                             })?,
-                        size: stat
-                            .size
-                            .with_context(|| format!("Missing size on item: {}", item.display()))?,
+                        size: stat.size.with_context(|| {
+                            format!("Missing size on item: {}", item_path.display())
+                        })?,
                     })
                 } else {
-                    bail!("Unknown item type at: {}", item.display());
+                    bail!("Unknown item type at: {}", item_path.display());
                 }
 
-                items.push(DriverItem { path, metadata });
+                let item = DriverItem { path, metadata };
+
+                if let Some(handler) = &on_item {
+                    handler(&item);
+                }
+
+                items.push(item);
 
                 if metadata.is_dir() {
-                    let sub_items =
-                        read_sub_dir(&item, sftp, ignore, root, Arc::clone(&stop_request))?;
+                    let sub_items = read_sub_dir(
+                        &item_path,
+                        sftp,
+                        ignore,
+                        root,
+                        Arc::clone(&stop_request),
+                        on_item,
+                    )?;
                     items.extend(sub_items);
                 }
             }
@@ -110,7 +129,14 @@ impl Driver for SftpDriver {
             Ok(items)
         }
 
-        read_sub_dir(root, &self.sftp, ignore, root, stop_request)
+        read_sub_dir(
+            root,
+            &self.sftp,
+            ignore,
+            root,
+            stop_request,
+            on_item.as_deref(),
+        )
     }
 }
 

@@ -21,8 +21,9 @@ pub fn make_snapshot(
     path: String,
     ignore: &HashSet<&str>,
     stop_request: Arc<AtomicBool>,
+    on_item: Option<OnItemHandler>,
 ) -> Result<Snapshot> {
-    let items = driver.find_all(&path, ignore, Arc::clone(&stop_request));
+    let items = driver.find_all(&path, ignore, Arc::clone(&stop_request), on_item);
 
     // TODO: When https://github.com/rust-lang/rust/issues/91345 is resolved, use `inspect_err` instead of a match
     let items = match items {
@@ -50,8 +51,12 @@ pub trait Driver {
         dir: &str,
         ignore: &HashSet<&str>,
         stop_request: Arc<AtomicBool>,
+        on_item: Option<OnItemHandler>,
     ) -> Result<Vec<DriverItem>>;
 }
+
+pub type OnItemHandler = Box<dyn Fn(&DriverItem) + Send + Sync + 'static>;
+pub type OnItemHandlerRef<'a> = &'a (dyn Fn(&DriverItem) + Send + Sync + 'static);
 
 #[derive(Debug)]
 pub struct DriverItem {
