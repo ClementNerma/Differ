@@ -188,7 +188,7 @@ fn stateful_read_dir(dir: PathBuf, state: ReadDirState) -> Result<()> {
 }
 
 fn stateful_read_dir_spawn(dir: PathBuf, state: ReadDirState) {
-    std::thread::spawn(move || {
+    rayon::spawn(move || {
         // TODO: handle erros
         stateful_read_dir(dir, state).unwrap()
     });
